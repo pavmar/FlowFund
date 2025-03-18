@@ -36,18 +36,34 @@
 
 // export default CreateAccount;
 
-import React from 'react';
+import React, {useState} from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import axios from 'axios';
 
 const CreateAccount = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+
+  const handleSubmitRegister = async () => {
+    try {
+      const response = await axios.post('http://localhost:5000/register', { username, email, phone, password });
+      localStorage.setItem('token', response.data.token);
+      alert('Registration is successfull. \n You can now login');
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Create Account</Text>
-      <TextInput style={styles.input} placeholder="Full Name" />
-      <TextInput style={styles.input} placeholder="Email" keyboardType="email-address" />
-      <TextInput style={styles.input} placeholder="Phone Number" keyboardType="phone-pad" />
-      <TextInput style={styles.input} placeholder="Password" secureTextEntry />
-      <TouchableOpacity style={styles.button} onPress={() => {}}>
+      <TextInput style={styles.input} onChangeText={setUsername} placeholder="Full Name" />
+      <TextInput style={styles.input} onChangeText={setEmail} placeholder="Email" keyboardType="email-address" />
+      <TextInput style={styles.input} onChangeText={setPhone} placeholder="Phone Number" keyboardType="phone-pad" />
+      <TextInput style={styles.input} onChangeText={setPassword} placeholder="Password" secureTextEntry />
+      <TouchableOpacity style={styles.button} onPress={() => { handleSubmitRegister()}}>
         <Text style={styles.buttonText}>Register</Text>
       </TouchableOpacity>
     </View>

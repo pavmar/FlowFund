@@ -35,19 +35,42 @@
 // export default Login;
 
 
-import React from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
+import { api } from '../config/api.js';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 
+
 const Login = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  
+  const handleLogin = async () => {
+    const response = await fetch('http://localhost:5001/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
+      alert(data.message);
+      
+    } else {
+      alert('Login failed');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Login</Text>
-      <TextInput style={styles.input} placeholder="Email" keyboardType="email-address" />
-      <TextInput style={styles.input} placeholder="Password" secureTextEntry />
-      <TouchableOpacity style={styles.button} onPress={() => {}}>
+      <TextInput style={styles.input} onChangeText={setUsername} placeholder="Email" keyboardType="email-address" />
+      <TextInput style={styles.input} onChangeText={setPassword} placeholder="Password" secureTextEntry />
+      <TouchableOpacity style={styles.button} onPress={() => { handleLogin()}}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
     </View>
+
   );
 };
 
