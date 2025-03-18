@@ -39,20 +39,33 @@
 import React, {useState} from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import axios from 'axios';
+import { useNavigation } from '@react-navigation/native';
 
 const CreateAccount = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-
+  const navigation = useNavigation();
   const handleSubmitRegister = async () => {
-    try {
+    
+    try{
       const response = await axios.post('http://localhost:5000/register', { username, email, phone, password });
       localStorage.setItem('token', response.data.token);
+      
       alert('Registration is successfull. \n You can now login');
-    } catch (error) {
-      console.error("Error fetching data:", error);
+      navigation.goBack();
+    } catch(error: unknown)
+    {
+      if (axios.isAxiosError(error)) {
+        console.error('Axios error:', error.message);
+        if (error.response) {
+          console.error('Status code:', error.response.status);
+          console.error('Response data:', error.response.data);
+        }
+      } else {
+        console.error('An unexpected error occurred:', error);
+      }
     }
   };
 

@@ -38,12 +38,15 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { api } from '../config/api.js';
+import { useNavigation } from '@react-navigation/native';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 
 
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const navigation = useNavigation();
+  
   
   const handleLogin = async () => {
     const response = await fetch('http://localhost:5001/login', {
@@ -55,6 +58,7 @@ const Login = () => {
       const data = await response.json();
       localStorage.setItem('token', data.token);
       alert(data.message);
+      navigation.navigate('MarketPlace')
       
     } else {
       alert('Login failed');
