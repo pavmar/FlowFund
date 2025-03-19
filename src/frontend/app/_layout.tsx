@@ -1,37 +1,38 @@
 import { Stack } from 'expo-router';
+import NavBar from './components/Navbar'; // Import your NavBar component
 
 export default function RootLayout() {
   return (
-    <Stack>
-      {/* Home Screen */}
-      <Stack.Screen
-        name="index" // Default route (home screen)
-        options={{ headerShown: false }} // Hide the header for the home screen
-      />
+    <>
+      {/* Add the NavBar here */}
+      <NavBar />
 
-      {/* Login Screen */}
-      <Stack.Screen
-        name="login" // Route for the login screen
-        options={{ title: 'Login' }} // Set the title for the screen
-      />
+      {/* Stack Navigator */}
+      <Stack>
+        {/* Home Screen */}
+        <Stack.Screen
+          name="index" // Default route (home screen)
+          options={{ headerShown: false }} // Hide the default header for the home screen
+        />
 
-      {/* Register Screen */}
-      <Stack.Screen
-        name="register" // Route for the register screen
-        options={{ title: 'Register' }} // Set the title for the screen
-      />
+        {/* Login Screen */}
+        <Stack.Screen
+          name="login" // Route for the login screen
+          options={{ headerShown: false }} // Hide the default header for the login screen
+        />
 
-      {/* Tabs Group */}
-      <Stack.Screen
-        name="(tabs)" // Route for the tabs group
-        options={{ headerShown: false }} // Hide the header for tabs
-      />
+        {/* Register Screen */}
+        <Stack.Screen
+          name="register" // Route for the register screen
+          options={{ headerShown: false }} // Hide the default header for the register screen
+        />
 
-      {/* Transaction History Screen */}
-      <Stack.Screen
-        name="transactionHistory" // Route for the transaction history screen
-        options={{ title: 'Transaction History' }} // Set the title for the screen
-      />
-    </Stack>
+        {/* Tabs Group */}
+        <Stack.Screen
+          name="(tabs)" // Route for the tabs group
+          options={{ headerShown: false }} // Hide the default header for tabs
+        />
+      </Stack>
+    </>
   );
 }
