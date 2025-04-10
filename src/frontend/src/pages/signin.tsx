@@ -2,11 +2,11 @@
 import * as React from 'react';
 import Alert from '@mui/material/Alert';
 import LinearProgress from '@mui/material/LinearProgress';
+import Button from '@mui/material/Button';
 import { SignInPage } from '@toolpad/core/SignInPage';
 import { Navigate, useNavigate } from 'react-router';
 import { useSession, type Session } from '../SessionContext';
 import { signInWithGoogle, signInWithCredentials } from '../firebase/auth';
-
 
 export default function SignIn() {
   const { session, setSession, loading } = useSession();
@@ -29,7 +29,7 @@ export default function SignIn() {
           if (provider.id === 'google') {
             result = await signInWithGoogle();
           }
-          
+
           if (provider.id === 'credentials') {
             const email = formData?.get('email') as string;
             const password = formData?.get('password') as string;
@@ -58,7 +58,18 @@ export default function SignIn() {
           return { error: error instanceof Error ? error.message : 'An error occurred' };
         }
       }}
-        
+      slots={{
+        signUpLink: () => (
+          <Button
+            variant="text"
+            onClick={() => {
+              navigate('/sign-up');
+            }}
+          >
+            Sign Up
+          </Button>
+        )
+      }}
     />
   );
 }

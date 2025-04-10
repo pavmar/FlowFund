@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import { firebaseAuth } from './firebaseConfig.ts';
 
@@ -71,6 +72,26 @@ export async function signInWithCredentials(email: string, password: string) {
     };
   }
 }
+
+export async function signUp (email: string, password: string)  {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+    const user = userCredential.user;
+    // Handle successful signup (e.g., redirect, store user data)
+    console.log("User created:", user);
+    return {
+      success: true,
+      user: user,
+      error: null,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      user: null,
+      error: error.message || 'Failed to sign in with email/password',
+    };
+  }
+};
 
 // Sign out functionality
 export const firebaseSignOut = async () => {

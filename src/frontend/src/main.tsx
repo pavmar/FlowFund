@@ -10,6 +10,7 @@ import BorrowPage from './pages/borrow';
 import WalletPage from './pages/wallet';
 import AboutPage from './pages/about';
 import SettingsPage from './pages/settings';
+import SignUp from './pages/signup';
 
 const router = createBrowserRouter([
   {
@@ -49,6 +50,10 @@ const router = createBrowserRouter([
         path: '/sign-in',
         Component: SignInPage,
       },
+      {
+        path : '/sign-up',
+        Component: SignUp,
+      }
     ],
   },
 ]);
