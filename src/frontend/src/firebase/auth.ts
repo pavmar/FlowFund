@@ -7,7 +7,7 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
-import { firebaseAuth } from './firebaseConfig';
+import { firebaseAuth } from './firebaseConfig.ts';
 
 const googleProvider = new GoogleAuthProvider();
 const githubProvider = new GithubAuthProvider();
