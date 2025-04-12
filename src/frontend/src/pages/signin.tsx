@@ -1,6 +1,5 @@
 'use client';
 import * as React from 'react';
-import Alert from '@mui/material/Alert';
 import LinearProgress from '@mui/material/LinearProgress';
 import Button from '@mui/material/Button';
 import { SignInPage } from '@toolpad/core/SignInPage';
@@ -27,6 +26,7 @@ export default function SignIn() {
         let result;
         try {
           if (provider.id === 'google') {
+            console.log('Attempting Google sign-in...');
             result = await signInWithGoogle();
           }
 
@@ -35,26 +35,51 @@ export default function SignIn() {
             const password = formData?.get('password') as string;
 
             if (!email || !password) {
+              console.error('Email and password are required');
               return { error: 'Email and password are required' };
             }
 
+            console.log('Attempting credentials sign-in...');
             result = await signInWithCredentials(email, password);
           }
 
           if (result?.success && result?.user) {
-            const userSession: Session = {
-              user: {
-                name: result.user.displayName || '',
-                email: result.user.email || '',
-                image: result.user.photoURL || '',
-              },
-            };
-            setSession(userSession);
-            navigate(callbackUrl || '/', { replace: true });
-            return {};
+            console.log('Sign-in successful. Sending email to backend...');
+            console.log('Sending email to backend:', {
+              email: result.user.email,
+            });
+
+            // Call backend to add user email if it doesn't exist
+            const response = await fetch('http://localhost:9090/api/auth/addUser', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: result.user.email,
+              }),
+            });
+
+            if (response.ok) {
+              console.log('User email checked/added successfully in the backend.');
+              const user = await response.json();
+
+              const userSession: Session = {
+                user: {
+                  email: user.email,
+                },
+              };
+              setSession(userSession);
+              navigate(callbackUrl || '/', { replace: true });
+              return {};
+            } else {
+              const errorText = await response.text();
+              console.error('Failed to connect to the backend or user creation failed:', errorText);
+              return { error: 'Failed to sign in' };
+            }
           }
+          console.error('Sign-in failed:', result?.error || 'Unknown error');
           return { error: result?.error || 'Failed to sign in' };
         } catch (error) {
+          console.error('An error occurred during sign-in:', error);
           return { error: error instanceof Error ? error.message : 'An error occurred' };
         }
       }}
@@ -68,7 +93,7 @@ export default function SignIn() {
           >
             Sign Up
           </Button>
-        )
+        ),
       }}
     />
   );
