@@ -14,6 +14,7 @@
     "@mui/material": "^6",
     "@mui/material-nextjs": "^6",
     "@toolpad/core": "0.13.0",
+    "axios": "^1.8.4",
     "firebase": "^11",
     "metamask": "^0.0.1-security",
     "react": "^19",
