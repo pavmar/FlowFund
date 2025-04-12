@@ -3,11 +3,17 @@ import { MetaMaskUIProvider } from '@metamask/sdk-react-ui';
 import Metamask from './metamask';
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
 
 export default function WalletPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState('');
   const [balance, setBalance] = useState<string | null>(null);
+  const [sendAmount, setSendAmount] = useState(''); // State to store the amount to send
+  const [recipientAddress, setRecipientAddress] = useState(''); // State to store the recipient's wallet address
 
   useEffect(() => {
     async function fetchAccountsAndBalance() {
@@ -40,6 +46,22 @@ export default function WalletPage() {
     fetchAccountsAndBalance();
   }, []);
 
+  const handleSend = () => {
+    if (!sendAmount || isNaN(Number(sendAmount)) || Number(sendAmount) <= 0) {
+      alert('Please enter a valid amount to send.');
+      return;
+    }
+    if (!recipientAddress) {
+      alert('Please enter a valid recipient address.');
+      return;
+    }
+    alert(`Send functionality is not implemented yet. Amount: ${sendAmount} ETH, Recipient: ${recipientAddress}`);
+  };
+
+  const handleReceive = () => {
+    alert(`Your wallet address is: ${walletAddress}`);
+  };
+
   return (
     <MetaMaskUIProvider
       sdkOptions={{
@@ -51,15 +73,54 @@ export default function WalletPage() {
       }}
     >
       <Metamask />
-      <div>
+      <Box
+        sx={{
+          marginTop: 4,
+          padding: 2,
+          border: '1px solid #ccc',
+          borderRadius: 4,
+          maxWidth: 400,
+          margin: 'auto',
+          textAlign: 'left', // Align the box content to the left
+        }}
+      >
+        <Typography variant="h6">Wallet Balance</Typography>
         {error ? (
-          <p style={{ color: 'red' }}>{error}</p>
+          <Typography variant="body1" color="error">
+            {error}
+          </Typography>
+        ) : balance !== null ? (
+          <Typography variant="body1">{balance} ETH</Typography>
         ) : (
-          <p>
-            Balance of {walletAddress}: {balance !== null ? `${balance} ETH` : 'Fetching balance...'}
-          </p>
+          <Typography variant="body1">Fetching balance...</Typography>
         )}
-      </div>
+        <Box sx={{ marginTop: 2 }}>
+          <TextField
+            label="Recipient Address"
+            variant="outlined"
+            fullWidth
+            value={recipientAddress}
+            onChange={(e) => setRecipientAddress(e.target.value)}
+            sx={{ marginBottom: 2 }}
+          />
+          <TextField
+            label="Amount to Send (ETH)"
+            variant="outlined"
+            fullWidth
+            value={sendAmount}
+            onChange={(e) => setSendAmount(e.target.value)}
+            sx={{ marginBottom: 2 }}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+            <Button variant="contained" color="primary" onClick={handleSend}>
+              Send
+            </Button>
+            <Button variant="contained" color="secondary" onClick={handleReceive}>
+              Receive
+            </Button>
+          </Box>
+        </Box>
+      </Box>
     </MetaMaskUIProvider>
   );
 }
