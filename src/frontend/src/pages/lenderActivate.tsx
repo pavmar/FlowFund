@@ -35,7 +35,8 @@ export default function LenderActivatePage() {
       });
 
       if (response.status === 200) {
-        alert('Details submitted successfully!');
+        alert('Details submitted successfully!'); // Show success alert
+        setFormData({ interest: '', amount: '', duration: '', collateral: '' }); // Clear form fields
       }
     } catch (error) {
       console.error('Error submitting details:', error);
