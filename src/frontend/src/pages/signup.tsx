@@ -20,13 +20,26 @@ export default function SignUp() {
       setError('Email and password are required');
       return;
     }
-
+  
     try {
       const result = await signUp(email, password);
       if (result?.success) {
-        setSuccess(true);
-        setError('');
-        setTimeout(() => navigate('/sign-in'), 1000); // Redirect to sign-in page after 2 seconds
+        // Add user details to the backend
+        const response = await fetch('http://localhost:9090/api/auth/addUser', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, fullName: 'New User' }), // Add fullName if needed
+        });
+  
+        if (response.ok) {
+          setSuccess(true);
+          setError('');
+          setTimeout(() => navigate('/sign-in'), 1000); // Redirect to sign-in page after 1 second
+        } else {
+          const errorText = await response.text();
+          console.error('Failed to add user to the backend:', errorText);
+          setError('Failed to register user in the backend');
+        }
       } else {
         setError(result?.error || 'Failed to register');
       }

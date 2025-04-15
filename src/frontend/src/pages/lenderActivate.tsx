@@ -27,20 +27,28 @@ export default function LenderActivatePage() {
       alert('User email not found in session.');
       return;
     }
-
+  
     try {
-      const response = await axios.post('http://localhost:9090/api/lenderActivate', {
-        email, // Send the email along with other form data
-        ...formData,
+      const response = await axios.post('http://localhost:9090/api/lender/activate', {
+        email, // Pass the user email
+        interestRate: parseFloat(formData.interest),
+        durationDays: parseInt(formData.duration, 10),
+        minBorrowAmount: parseFloat(formData.amount),
       });
-
+  
       if (response.status === 200) {
-        alert('Details submitted successfully!'); // Show success alert
+        alert('Lender activated successfully!');
         setFormData({ interest: '', amount: '', duration: '', collateral: '' }); // Clear form fields
       }
-    } catch (error) {
-      console.error('Error submitting details:', error);
-      alert('Failed to submit details.');
+    } catch (error: any) {
+      if (error.response && error.response.status === 404) {
+        alert('User not found. Please ensure the email is correct.');
+      } else if (error.response && error.response.data.error) {
+        alert(error.response.data.error); // Display the error message from the backend
+      } else {
+        console.error('Error activating lender:', error);
+        alert('Failed to activate lender.');
+      }
     }
   };
 

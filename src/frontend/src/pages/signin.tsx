@@ -44,37 +44,23 @@ export default function SignIn() {
           }
 
           if (result?.success && result?.user) {
-            console.log('Sign-in successful. Sending email to backend...');
-            console.log('Sending email to backend:', {
-              email: result.user.email,
-            });
+            console.log('Sign-in successful.');
+            const userSession: Session = {
+              user: {
+                email: result.user.email,
+              },
+            };
+            setSession(userSession);
 
-            // Call backend to add user email if it doesn't exist
-            const response = await fetch('http://localhost:9090/api/auth/addUser', {
+            // Update login activity in the backend
+            await fetch('http://localhost:9090/api/auth/login', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: result.user.email,
-              }),
+              body: JSON.stringify({ email: result.user.email }),
             });
 
-            if (response.ok) {
-              console.log('User email checked/added successfully in the backend.');
-              const user = await response.json();
-
-              const userSession: Session = {
-                user: {
-                  email: user.email,
-                },
-              };
-              setSession(userSession);
-              navigate(callbackUrl || '/', { replace: true });
-              return {};
-            } else {
-              const errorText = await response.text();
-              console.error('Failed to connect to the backend or user creation failed:', errorText);
-              return { error: 'Failed to sign in' };
-            }
+            navigate(callbackUrl || '/', { replace: true });
+            return {};
           }
           console.error('Sign-in failed:', result?.error || 'Unknown error');
           return { error: result?.error || 'Failed to sign in' };
