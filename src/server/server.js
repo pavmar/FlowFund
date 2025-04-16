@@ -304,14 +304,48 @@ app.get('/api/lenders', async (req, res) => {
 });
 
 
+// app.post('/api/borrow', async (req, res) => {
+//   const { contractId, lenderId, borrowAmount, pendingAmount, lastTransactionDetails } = req.body;
+//   console.log(req.body);
+//   try {
+//     if (!contractId || !lenderId || !borrowAmount || !pendingAmount) {
+//       return res.status(400).json({ error: 'All fields are required' });
+//     }
+
+//     const borrow = new Borrow({
+//       contractId,
+//       lenderId,
+//       borrowAmount,
+//       pendingAmount,
+//       lastTransactionDetails,
+//     });
+
+//     await borrow.save();
+//     res.status(201).json({ message: 'Borrow request created successfully', borrow });
+//   } catch (error) {
+//     console.error('Error creating borrow request:', error);
+//     res.status(500).json({ error: 'Failed to create borrow request' });
+//   }
+// });
+
 app.post('/api/borrow', async (req, res) => {
   const { contractId, lenderId, borrowAmount, pendingAmount, lastTransactionDetails } = req.body;
 
+  // Log the incoming request body
+  console.log('Borrow request initiated');
+  console.log('Request body received:', req.body);
+
   try {
+    // Validate required fields
     if (!contractId || !lenderId || !borrowAmount || !pendingAmount) {
+      console.error('Validation failed: Missing required fields');
       return res.status(400).json({ error: 'All fields are required' });
     }
 
+    // Log the validation success
+    console.log('Validation successful');
+
+    // Create a new Borrow record
     const borrow = new Borrow({
       contractId,
       lenderId,
@@ -320,10 +354,19 @@ app.post('/api/borrow', async (req, res) => {
       lastTransactionDetails,
     });
 
+    // Log the Borrow object before saving
+    console.log('Borrow object to be saved:', borrow);
+
+    // Save the Borrow record to the database
     await borrow.save();
+
+    // Log the success message after saving
+    console.log('Borrow record saved successfully:', borrow);
+
     res.status(201).json({ message: 'Borrow request created successfully', borrow });
   } catch (error) {
-    console.error('Error creating borrow request:', error);
+    // Log the error details
+    console.error('Error creating borrow request:', error.stack || error.message || error);
     res.status(500).json({ error: 'Failed to create borrow request' });
   }
 });
