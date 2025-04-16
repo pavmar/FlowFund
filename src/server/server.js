@@ -19,143 +19,105 @@ mongoose
   .then(() => console.log('MongoDB connected'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
-// User Schema and Model
-
+// User Schema
 const userSchema = new mongoose.Schema({
-  userId: { type: String, unique: true }, // Unique user identifier (optional for now)
-  fullName: { type: String }, // Full name of the user (optional)
-  email: { type: String, required: true, unique: true }, // Email address (required)
-  walletAddress: { type: String }, // Public wallet address (optional)
-  walletBalance: { type: Number, default: 0 }, // Wallet balance in platform's base currency (optional)
-  isLender: { type: Boolean, default: false }, // Whether the user is a lender (optional)
-  isBorrower: { type: Boolean, default: false }, // Whether the user is a borrower (optional)
-  loginActivity: { type: [Date], default: [] }, // Array of login timestamps for engagement tracking (optional)
+  userEmail: { type: String, required: true, unique: true },
+  walletAddress: { type: String, default: null },
+  privateKey: { type: String, default: null },
+  isLender: { type: Boolean, default: false },
+  isBorrower: { type: Boolean, default: false },
+  lastLogin: { type: Date, default: Date.now },
+  creditScore: { type: Number, default: 0 },
+  collateralAddress: { type: String, default: null },
+  collateralAmount: { type: Number, default: 0 },
 });
-
 
 const User = mongoose.model('User', userSchema);
 
-
-// Lender Schema and Model
+// Lender Schema
 const lenderSchema = new mongoose.Schema({
-  lenderEmail: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Reference to User schema by ObjectId
-  lendingTerms: {
-    interestRate: { type: Number, required: true }, // e.g., 5%
-    durationDays: { type: Number, required: true }, // e.g., 90 days
-    minBorrowAmount: { type: Number, required: true }, // Minimum borrow amount
-  },
-  activeLoans: { type: [String], default: [] }, // Array of Loan IDs
-  totalInterestEarned: { type: Number, default: 0 }, // Total interest earned
-  expectedInterest: { type: Number, default: 0 }, // Expected interest from ongoing loans
-  dateJoined: { type: Date, default: Date.now }, // Date the lender joined
+  contractId: { type: String, required: true }, // Dummy data for testnet
+  lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  lendingConditions: { type: String, required: true },
+  initialLendingCapacity: { type: Number, required: true },
+  lendingAmountBalance: { type: Number, required: true },
+  currentBalance: { type: Number, required: true },
+  borrowerCount: { type: Number, default: 0 },
+  interestRate: { type: Number, required: true }, // New field
+  durationDays: { type: Number, required: true }, // New field
+  minBorrowAmount: { type: Number, required: true }, // New field
+  collateralAddress: { type: String, required: true }, // New field
+  collateral: { type: String, required: true }, // New field
 });
-
 
 const Lender = mongoose.model('Lender', lenderSchema);
 
-// Borrower Schema and Model
-
-const borrowerSchema = new mongoose.Schema({
-  borrowerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Reference to User schema
-  creditRating: { type: Number, default: 0 }, // Borrower's credit rating
-  collateralValue: { type: Number, default: 0 }, // Value of collateral provided by the borrower
-  onTimePayments: { type: Number, default: 0 }, // Number of on-time payments made by the borrower
-  totalLogins: { type: Number, default: 0 }, // Total number of logins by the borrower
-  loanHistory: [
-    {
-      loanId: { type: String, required: true }, // Unique loan ID
-      amount: { type: Number, required: true }, // Loan amount
-      interestRate: { type: Number, required: true }, // Interest rate
-      tenureDays: { type: Number, required: true }, // Loan duration in days
-      collateralValue: { type: Number, required: true }, // Collateral value for the loan
-    },
-  ],
+// Borrow Schema
+const borrowSchema = new mongoose.Schema({
+  contractId: { type: String, required: true },
+  lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lender', required: true },
+  borrowAmount: { type: Number, required: true },
+  borrowDate: { type: Date, default: Date.now },
+  pendingAmount: { type: Number, required: true },
+  lastTransactionDetails: { type: String, default: null },
 });
 
+const Borrow = mongoose.model('Borrow', borrowSchema);
 
-const Borrower = mongoose.model('Borrower', borrowerSchema);
-
-
-//Loan Schema
-
-const loanSchema = new mongoose.Schema({
-  loanId: { type: String, required: true, unique: true }, // Unique loan identifier
-  lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Reference to lender's userId
-  borrowerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Reference to borrower's userId
-  amount: { type: Number, required: true }, // Loan amount
-  interestRate: { type: Number, required: true }, // Interest rate
-  interestPaidSoFar: { type: Number, default: 0 }, // Interest paid so far
-  startDate: { type: Date, default: Date.now }, // Loan start date
-  endDate: { type: Date, required: true }, // Loan end date
-  nextPaymentDue: { type: Date, required: true }, // Next payment due date
-  paymentDueAmount: { type: Number, required: true }, // Amount due for the next payment
-  isPreclosed: { type: Boolean, default: false }, // Whether the loan is preclosed
-  isActive: { type: Boolean, default: true }, // Whether the loan is active
-  tenureDays: { type: Number, required: true }, // Loan tenure in days
-  collateralHeld: { type: Number, required: true }, // Collateral held for the loan
+// Transaction Schema
+const transactionSchema = new mongoose.Schema({
+  transactionId: { type: String, unique: true, default: () => `txn_${Date.now()}` },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  transactionType: { type: String, enum: ['borrow', 'installment'], required: true },
+  transactionAmount: { type: Number, required: true },
+  transactionDate: { type: Date, default: Date.now },
+  secondPartyId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  lastPaidTimestamp: { type: Date, default: null },
+  comment: { type: String, default: null },
 });
 
-const Loan = mongoose.model('Loan', loanSchema);
+const Transaction = mongoose.model('Transaction', transactionSchema);
 
-app.get('/api/lenders', async (req, res) => {
-  try {
-    console.log('Fetching lenders from the database...');
-    const lenders = await Lender.find()
-      .populate({
-        path: 'lenderEmail', // Reference the User schema
-        select: 'email', // Only fetch the email field from the User schema
-      })
-      .select('lendingTerms activeLoans totalInterestEarned expectedInterest dateJoined'); // Select specific fields from the Lender schema
-
-    console.log('Lenders fetched successfully:', lenders);
-    res.status(200).json(lenders);
-  } catch (error) {
-    console.error('Error fetching lenders:', error); // Log the error for debugging
-    res.status(500).json({ error: 'Failed to fetch lenders' });
-  }
-});
-
-
-
-const { v4: uuidv4 } = require('uuid'); // Import UUID for generating unique user IDs
+// Routes
+// api changes starts here
 
 app.post('/api/auth/addUser', async (req, res) => {
-  const { email, fullName, walletAddress } = req.body;
+  const { email, walletAddress, privateKey } = req.body;
 
   try {
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    // Check if the user already exists in the database
-    let user = await User.findOne({ email });
+    // Check if the user already exists
+    let user = await User.findOne({ userEmail: email });
 
     if (!user) {
-      // If user does not exist, create a new user
+      // Create a new user
       user = new User({
-        userId: uuidv4(), // Generate a unique user ID
-        fullName: fullName || '', // Optional field
-        email,
-        walletAddress: walletAddress || '', // Optional field
-        walletBalance: 1000, // Default wallet balance
-        isLender: false, // Default value
-        isBorrower: false, // Default value
-        loginActivity: [new Date()], // Add the current timestamp to loginActivity
+        userEmail: email,
+        walletAddress: walletAddress || null,
+        privateKey: privateKey || null,
+        isLender: false,
+        isBorrower: false,
+        lastLogin: new Date(),
+        creditScore: 0,
+        collateralAddress: null,
+        collateralAmount: 0,
       });
+
       await user.save();
       console.log('New user created:', user);
     } else {
       console.log('User already exists:', user);
     }
 
-    // Return the user email
-    res.status(200).json({ email: user.email });
+    res.status(201).json({ message: 'User registered successfully', user });
   } catch (error) {
-    console.error('Error during user addition:', error);
-    res.status(500).json({ error: 'Failed to add user' });
+    console.error('Error registering user:', error);
+    res.status(500).json({ error: 'Failed to register user' });
   }
 });
-
 
 app.post('/api/auth/login', async (req, res) => {
   const { email } = req.body;
@@ -166,194 +128,120 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Find the user by email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ userEmail: email });
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Add the current timestamp to the loginActivity array
-    user.loginActivity.push(new Date());
+    // Update the lastLogin field
+    user.lastLogin = new Date();
     await user.save();
 
-    res.status(200).json({ message: 'Login activity updated successfully', user });
+    res.status(200).json({ message: 'Login timestamp updated successfully', user });
   } catch (error) {
-    console.error('Error updating login activity:', error);
-    res.status(500).json({ error: 'Failed to update login activity' });
+    console.error('Error updating login timestamp:', error);
+    res.status(500).json({ error: 'Failed to update login timestamp' });
   }
 });
-
-
-app.post('/api/borrower/createOrUpdate', async (req, res) => {
-  const { userId, creditRating, collateralValue, onTimePayments, loanId } = req.body;
-
-  try {
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' });
-    }
-
-    // Find the borrower by userId
-    let borrower = await Borrower.findOne({ borrowerId: userId });
-
-    if (!borrower) {
-      // If borrower does not exist, create a new borrower
-      borrower = new Borrower({
-        borrowerId: userId,
-        creditRating: creditRating || 0,
-        collateralValue: collateralValue || 0,
-        onTimePayments: onTimePayments || 0,
-        totalLogins: 1, // Initialize with 1 login
-        loanHistory: loanId ? [loanId] : [],
-      });
-    } else {
-      // Update existing borrower details
-      if (creditRating !== undefined) borrower.creditRating = creditRating;
-      if (collateralValue !== undefined) borrower.collateralValue = collateralValue;
-      if (onTimePayments !== undefined) borrower.onTimePayments += onTimePayments;
-      if (loanId) borrower.loanHistory.push(loanId);
-      borrower.totalLogins += 1; // Increment total logins
-    }
-
-    await borrower.save();
-    res.status(200).json({ message: 'Borrower details updated successfully', borrower });
-  } catch (error) {
-    console.error('Error updating borrower details:', error);
-    res.status(500).json({ error: 'Failed to update borrower details' });
-  }
-});
-
-//  create or update a lender's details when they activate their account as a lende
 app.post('/api/lender/activate', async (req, res) => {
-  const { email, interestRate, durationDays, minBorrowAmount } = req.body;
+  const { email, interestRate, durationDays, minBorrowAmount, collateralAddress, collateral } = req.body;
 
   try {
-    if (!email || !interestRate || !durationDays || !minBorrowAmount) {
-      return res.status(400).json({ error: 'All fields are required' });
-    }
+    console.log('POST /api/lender/activate called');
+    console.log('Request body received:', req.body);
 
-    // Check if the user exists
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Check if the user's wallet balance is sufficient
-    if (user.walletBalance < minBorrowAmount) {
-      return res.status(400).json({ error: 'Insufficient wallet balance to lend' });
-    }
-
-    // Check if the user is already a lender
-    let lender = await Lender.findOne({ lenderEmail: email });
-
-    if (!lender) {
-      // Create a new lender
-      lender = new Lender({
-        lenderEmail: email,
-        lendingTerms: {
-          interestRate,
-          durationDays,
-          minBorrowAmount,
-        },
-        activeLoans: [],
-        totalInterestEarned: 0,
-        expectedInterest: 0,
-        dateJoined: new Date(),
-      });
-      user.isLender = true; // Mark the user as a lender
-      await user.save();
-    } else {
-      // Update existing lender details
-      lender.lendingTerms = {
-        interestRate,
-        durationDays,
-        minBorrowAmount,
-      };
-    }
-
-    await lender.save();
-    res.status(200).json({ message: 'Lender activated successfully', lender });
-  } catch (error) {
-    console.error('Error activating lender:', error);
-    res.status(500).json({ error: 'Failed to activate lender' });
-  }
-});
-
-
-app.get('/api/auth/getUserByEmail', async (req, res) => {
-  const { email } = req.query;
-
-  try {
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
 
     // Find the user by email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ userEmail: email });
+    console.log('User found in database:', user);
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.status(200).json({ userId: user._id });
+    // Update the user's isLender field
+    user.isLender = true;
+    await user.save();
+    console.log('User updated to lender:', user);
+
+    // Create a new lender record
+    const lender = new Lender({
+      contractId: `contract_${Date.now()}`,
+      lenderId: user._id,
+      lendingConditions: `Interest: ${interestRate}%, Duration: ${durationDays} days`,
+      initialLendingCapacity: minBorrowAmount,
+      lendingAmountBalance: minBorrowAmount,
+      currentBalance: minBorrowAmount,
+      borrowerCount: 0,
+      interestRate,
+      durationDays,
+      minBorrowAmount,
+      collateralAddress,
+      collateral,
+    });
+
+    await lender.save();
+    console.log('Lender record created:', lender);
+
+    res.status(201).json({ message: 'Lender account activated successfully', lender });
   } catch (error) {
-    console.error('Error fetching user by email:', error);
-    res.status(500).json({ error: 'Failed to fetch user' });
+    console.error('Error activating lender account:', error.stack || error.message || error);
+    res.status(500).json({ error: 'Failed to activate lender account' });
   }
 });
 
+// api changes ends her
 
-//borrow endpoints
 
 app.post('/api/borrow', async (req, res) => {
-  const { lenderId, borrowerEmail, amount, interestRate, tenureDays, collateralValue } = req.body;
+  const { contractId, lenderId, borrowAmount, pendingAmount, lastTransactionDetails } = req.body;
 
   try {
-    console.log('Borrow request received:', req.body);
-
-    // Fetch borrower by email
-    const borrower = await User.findOne({ email: borrowerEmail });
-    if (!borrower) {
-      console.error('Borrower not found');
-      return res.status(404).json({ error: 'Borrower not found' });
-    }
-    console.log('Borrower found:', borrower);
-
-    const borrowerId = borrower._id;
-
-    // Check if the borrower already exists in the Borrower schema
-    let borrowerDetails = await Borrower.findOne({ borrowerId });
-    if (!borrowerDetails) {
-      // Create a new borrower entry
-      borrowerDetails = new Borrower({
-        borrowerId,
-        collateralValue,
-        loanHistory: [], // Initialize loan history
-      });
-      console.log('New borrower created:', borrowerDetails);
+    if (!contractId || !lenderId || !borrowAmount || !pendingAmount) {
+      return res.status(400).json({ error: 'All fields are required' });
     }
 
-    // Add the borrow request details to the loan history
-    const loanId = `loan_${Date.now()}`;
-    borrowerDetails.loanHistory.push({
-      loanId,
-      amount,
-      interestRate,
-      tenureDays,
-      collateralValue,
+    const borrow = new Borrow({
+      contractId,
+      lenderId,
+      borrowAmount,
+      pendingAmount,
+      lastTransactionDetails,
     });
-    console.log('Loan details added to borrower:', borrowerDetails);
 
-    // Save the updated borrower details
-    await borrowerDetails.save();
-    console.log('Borrower details updated and saved:', borrowerDetails);
-
-    // Respond with a success message
-    res.status(200).json({
-      message: 'Borrow request processed successfully',
-      borrowerDetails,
-    });
+    await borrow.save();
+    res.status(201).json({ message: 'Borrow request created successfully', borrow });
   } catch (error) {
-    console.error('Error processing borrow request:', error);
-    res.status(500).json({ error: 'Failed to process borrow request' });
+    console.error('Error creating borrow request:', error);
+    res.status(500).json({ error: 'Failed to create borrow request' });
+  }
+});
+
+app.post('/api/transaction', async (req, res) => {
+  const { userId, transactionType, transactionAmount, secondPartyId, comment } = req.body;
+
+  try {
+    if (!userId || !transactionType || !transactionAmount || !secondPartyId) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    const transaction = new Transaction({
+      userId,
+      transactionType,
+      transactionAmount,
+      secondPartyId,
+      comment,
+    });
+
+    await transaction.save();
+    res.status(201).json({ message: 'Transaction recorded successfully', transaction });
+  } catch (error) {
+    console.error('Error recording transaction:', error);
+    res.status(500).json({ error: 'Failed to record transaction' });
   }
 });
 

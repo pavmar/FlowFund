@@ -53,11 +53,22 @@ export default function SignIn() {
             setSession(userSession);
 
             // Update login activity in the backend
-            await fetch('http://localhost:9090/api/auth/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: result.user.email }),
-            });
+            try {
+              const loginResponse = await fetch('http://localhost:9090/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: result.user.email }),
+              });
+
+              if (!loginResponse.ok) {
+                const errorText = await loginResponse.text();
+                console.error('Failed to update last login in the backend:', errorText);
+              } else {
+                console.log('Last login updated successfully in the backend.');
+              }
+            } catch (error) {
+              console.error('Error while updating last login in the backend:', error);
+            }
 
             navigate(callbackUrl || '/', { replace: true });
             return {};
