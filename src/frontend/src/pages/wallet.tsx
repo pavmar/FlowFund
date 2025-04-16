@@ -14,6 +14,7 @@ export default function WalletPage() {
   const [balance, setBalance] = useState<string | null>(null);
   const [sendAmount, setSendAmount] = useState(''); // State to store the amount to send
   const [recipientAddress, setRecipientAddress] = useState(''); // State to store the recipient's wallet address
+  const [transactionHash, setTransactionHash] = useState('');
 
   useEffect(() => {
     async function fetchAccountsAndBalance() {
@@ -46,7 +47,7 @@ export default function WalletPage() {
     fetchAccountsAndBalance();
   }, []);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!sendAmount || isNaN(Number(sendAmount)) || Number(sendAmount) <= 0) {
       alert('Please enter a valid amount to send.');
       return;
@@ -55,7 +56,33 @@ export default function WalletPage() {
       alert('Please enter a valid recipient address.');
       return;
     }
-    alert(`Send functionality is not implemented yet. Amount: ${sendAmount} ETH, Recipient: ${recipientAddress}`);
+    if (window.ethereum) {
+      try {
+        // Request account access
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+  
+        // Connect to the provider
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+  
+        // Get the signer
+        const signer = provider.getSigner();
+  
+        // Send transaction
+        const tx = await signer.sendTransaction({
+          to: recipientAddress,
+          value: ethers.utils.parseEther(sendAmount), // Convert ETH to Wei
+        });
+  
+        // Wait for the transaction to be mined
+        await tx.wait();
+        setTransactionHash(tx.hash);
+        alert(`Transaction successful! Hash: ${tx.hash}`);
+      } catch (error) {
+        alert('Error sending Ether: ' + error.message);
+      }
+    } else {
+      alert('MetaMask not detected');
+    }
   };
 
   const handleReceive = () => {
