@@ -56,27 +56,18 @@ const Lender = mongoose.model('Lender', lenderSchema);
 const borrowSchema = new mongoose.Schema({
   contractId: { type: String, required: true },
   lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lender', required: true },
+  borrowerUserEmail: { type: String, required: true }, // Store the borrower's email
   borrowAmount: { type: Number, required: true },
   borrowDate: { type: Date, default: Date.now },
   pendingAmount: { type: Number, required: true },
   lastTransactionDetails: { type: String, default: null },
 });
 
+
+
 const Borrow = mongoose.model('Borrow', borrowSchema);
 
-// Transaction Schema
-const transactionSchema = new mongoose.Schema({
-  transactionId: { type: String, unique: true, default: () => `txn_${Date.now()}` },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  transactionType: { type: String, enum: ['borrow', 'installment'], required: true },
-  transactionAmount: { type: Number, required: true },
-  transactionDate: { type: Date, default: Date.now },
-  secondPartyId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  lastPaidTimestamp: { type: Date, default: null },
-  comment: { type: String, default: null },
-});
 
-const Transaction = mongoose.model('Transaction', transactionSchema);
 
 // Routes
 // api changes starts here
@@ -304,53 +295,126 @@ app.get('/api/lenders', async (req, res) => {
 });
 
 
+
+// app.post('/api/borrow', async (req, res) => {
+//   const { contractId, lenderId, borrowAmount, pendingAmount, lastTransactionDetails } = req.body;
+
+//   // Log the incoming request body
+//   console.log('Borrow request initiated');
+//   console.log('Request body received:', req.body);
+
+//   try {
+//     // Validate required fields
+//     if (!contractId || !lenderId || !borrowAmount || !pendingAmount) {
+//       console.error('Validation failed: Missing required fields');
+//       return res.status(400).json({ error: 'All fields are required' });
+//     }
+
+//     // Log the validation success
+//     console.log('Validation successful');
+
+//     // Create a new Borrow record
+//     const borrow = new Borrow({
+//       contractId,
+//       lenderId,
+//       borrowAmount,
+//       pendingAmount,
+//       lastTransactionDetails,
+//     });
+
+//     // Log the Borrow object before saving
+//     console.log('Borrow object to be saved:', borrow);
+
+//     // Save the Borrow record to the database
+//     await borrow.save();
+
+//     // Log the success message after saving
+//     console.log('Borrow record saved successfully:', borrow);
+
+//     res.status(201).json({ message: 'Borrow request created successfully', borrow });
+//   } catch (error) {
+//     // Log the error details
+//     console.error('Error creating borrow request:', error.stack || error.message || error);
+//     res.status(500).json({ error: 'Failed to create borrow request' });
+//   }
+// });
 app.post('/api/borrow', async (req, res) => {
-  const { contractId, lenderId, borrowAmount, pendingAmount, lastTransactionDetails } = req.body;
+  const { contractId, lenderId, borrowerUserEmail, borrowAmount, pendingAmount, lastTransactionDetails } = req.body;
+
+  // Log the incoming request body
+  console.log('Borrow request initiated');
+  console.log('Request body received:', req.body);
 
   try {
-    if (!contractId || !lenderId || !borrowAmount || !pendingAmount) {
+    // Validate required fields
+    if (!contractId || !lenderId || !borrowerUserEmail || !borrowAmount || !pendingAmount) {
+      console.error('Validation failed: Missing required fields');
       return res.status(400).json({ error: 'All fields are required' });
     }
 
+    // Log the validation success
+    console.log('Validation successful');
+
+    // Find the user by borrowerUserEmail
+    const user = await User.findOne({ userEmail: borrowerUserEmail });
+    if (!user) {
+      console.error('Borrower not found with email:', borrowerUserEmail);
+      return res.status(404).json({ error: 'Borrower not found' });
+    }
+
+    // Update the isBorrower field to true
+    if (!user.isBorrower) {
+      user.isBorrower = true;
+      await user.save();
+      console.log('User updated to borrower:', user);
+    }
+
+    // Find the lender by lenderId (not _id)
+    const lender = await Lender.findOne({ lenderId });
+    if (!lender) {
+      console.error('Lender not found with lenderId:', lenderId);
+      return res.status(404).json({ error: 'Lender not found' });
+    }
+
+    // Update the lender's currentBalance and lendingAmount
+    if (lender.currentBalance < borrowAmount) {
+      console.error('Borrow amount exceeds lender\'s current balance');
+      return res.status(400).json({ error: 'Borrow amount exceeds lender\'s current balance' });
+    }
+
+    lender.currentBalance -= borrowAmount; // Decrease current balance
+    lender.lendingAmount += borrowAmount; // Increase lending amount
+    await lender.save();
+    console.log('Lender updated successfully:', lender);
+
+    // Create a new Borrow record
     const borrow = new Borrow({
       contractId,
-      lenderId,
+      lenderId: lender._id, // Use the _id of the lender document
+      borrowerUserEmail, // Save the borrower's email
       borrowAmount,
       pendingAmount,
       lastTransactionDetails,
     });
 
+    // Log the Borrow object before saving
+    console.log('Borrow object to be saved:', borrow);
+
+    // Save the Borrow record to the database
     await borrow.save();
+
+    // Log the success message after saving
+    console.log('Borrow record saved successfully:', borrow);
+
     res.status(201).json({ message: 'Borrow request created successfully', borrow });
   } catch (error) {
-    console.error('Error creating borrow request:', error);
+    // Log the error details
+    console.error('Error creating borrow request:', error.stack || error.message || error);
     res.status(500).json({ error: 'Failed to create borrow request' });
   }
 });
 
-app.post('/api/transaction', async (req, res) => {
-  const { userId, transactionType, transactionAmount, secondPartyId, comment } = req.body;
 
-  try {
-    if (!userId || !transactionType || !transactionAmount || !secondPartyId) {
-      return res.status(400).json({ error: 'All fields are required' });
-    }
-
-    const transaction = new Transaction({
-      userId,
-      transactionType,
-      transactionAmount,
-      secondPartyId,
-      comment,
-    });
-
-    await transaction.save();
-    res.status(201).json({ message: 'Transaction recorded successfully', transaction });
-  } catch (error) {
-    console.error('Error recording transaction:', error);
-    res.status(500).json({ error: 'Failed to record transaction' });
-  }
-});
 
 // Start server
 const PORT = process.env.PORT || 9090;

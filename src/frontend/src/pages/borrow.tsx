@@ -33,9 +33,43 @@ export default function BorrowPage() {
   const handleSelectLender = (lenderId: string) => {
     setSelectedLender(lenderId);
     setShowBorrowForm(true); // Show the borrow form when a lender is selected
+    // Find the selected lender's details
+  const selectedLenderDetails = lenders.find((lender: any) => lender._id === lenderId);
+
+  // Log the selected lender's details
+  console.log('Selected Lender Details:', selectedLenderDetails);
+  
   };
 
-  const handleBorrowSubmit = () => {
+  // const handleBorrowSubmit = () => {
+  //   if (!selectedLender) {
+  //     alert('No lender selected.');
+  //     return;
+  //   }
+  
+  //   const lenderDetails = lenders.find((lender: any) => lender._id === selectedLender);
+  //   if (!lenderDetails) {
+  //     alert('Selected lender details not found.');
+  //     return;
+  //   }
+  
+  //   if (borrowAmount > lenderDetails.currentBalance) {
+  //     alert('Borrow amount cannot exceed the lender\'s available balance.');
+  //     return;
+  //   }
+    
+  //   // Log the selected lender's details
+  // console.log('Lender Details:', lenderDetails.lenderId);
+
+
+  
+
+  //   alert('Borrow request submitted successfully!');
+  //   setBorrowAmount(''); // Clear the borrow amount after submission
+  //   setShowBorrowForm(false); // Hide the borrow form after submission
+  // };
+
+  const handleBorrowSubmit = async () => {
     if (!selectedLender) {
       alert('No lender selected.');
       return;
@@ -47,14 +81,36 @@ export default function BorrowPage() {
       return;
     }
   
-    if (borrowAmount > lenderDetails.lendingAmountBalance) {
+    if (borrowAmount > lenderDetails.currentBalance) {
       alert('Borrow amount cannot exceed the lender\'s available balance.');
       return;
     }
   
-    alert('Borrow request submitted successfully!');
-    setBorrowAmount(''); // Clear the borrow amount after submission
-    setShowBorrowForm(false); // Hide the borrow form after submission
+    // Log the selected lender's details
+    console.log('Lender Details:', lenderDetails);
+    console.log('User Details:', session?.user?.email);
+
+  
+    try {
+      // Send the borrow request to the backend
+      const response = await axios.post('http://localhost:9090/api/borrow', {
+        contractId: lenderDetails.contractId, // Contract ID of the lender
+        lenderId: lenderDetails.lenderId, // Lender ID to be sent to the backend
+        borrowerUserEmail: session?.user?.email, // Borrower ID fetched from session
+        borrowAmount, // Borrow amount entered by the user
+        pendingAmount: borrowAmount, // Initially, pending amount is the same as borrow amount
+        lastTransactionDetails: `Borrowed ${borrowAmount} units`, // Transaction details
+      });
+  
+      if (response.status === 201) {
+        alert('Borrow request submitted successfully!');
+        setBorrowAmount(''); // Clear the borrow amount after submission
+        setShowBorrowForm(false); // Hide the borrow form after submission
+      }
+    } catch (error) {
+      console.error('Error submitting borrow request:', error);
+      alert('Failed to submit borrow request.');
+    }
   };
 
   return (
@@ -77,7 +133,7 @@ export default function BorrowPage() {
                   Duration: {lender.durationDays ?? 'N/A'} days
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Available Balance: {lender.lendingAmountBalance ?? 'N/A'} units
+                  Available Balance: {lender.currentBalance ?? 'N/A'} units
                 </Typography>
                 <RadioGroup
                   value={selectedLender}
