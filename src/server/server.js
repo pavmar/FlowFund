@@ -381,10 +381,28 @@ app.post('/api/borrow', async (req, res) => {
       console.log('User updated to borrower:', user);
     }
 
+    // Find the lender by lenderId (not _id)
+    const lender = await Lender.findOne({ lenderId });
+    if (!lender) {
+      console.error('Lender not found with lenderId:', lenderId);
+      return res.status(404).json({ error: 'Lender not found' });
+    }
+
+    // Update the lender's currentBalance and lendingAmount
+    if (lender.currentBalance < borrowAmount) {
+      console.error('Borrow amount exceeds lender\'s current balance');
+      return res.status(400).json({ error: 'Borrow amount exceeds lender\'s current balance' });
+    }
+
+    lender.currentBalance -= borrowAmount; // Decrease current balance
+    lender.lendingAmount += borrowAmount; // Increase lending amount
+    await lender.save();
+    console.log('Lender updated successfully:', lender);
+
     // Create a new Borrow record
     const borrow = new Borrow({
       contractId,
-      lenderId,
+      lenderId: lender._id, // Use the _id of the lender document
       borrowerUserEmail, // Save the borrower's email
       borrowAmount,
       pendingAmount,
