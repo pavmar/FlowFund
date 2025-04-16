@@ -28,7 +28,7 @@ export default function SignUp() {
         const response = await fetch('http://localhost:9090/api/auth/addUser', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, fullName: 'New User' }), // Add walletAddress or privateKey if needed
+          body: JSON.stringify({ email, fullName: 'New User' }), // Ensure email is passed here
         });
   
         if (response.ok) {
