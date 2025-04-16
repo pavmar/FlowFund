@@ -88,12 +88,15 @@ export default function BorrowPage() {
   
     // Log the selected lender's details
     console.log('Lender Details:', lenderDetails);
+    console.log('User Details:', session?.user?.email);
+
   
     try {
       // Send the borrow request to the backend
       const response = await axios.post('http://localhost:9090/api/borrow', {
         contractId: lenderDetails.contractId, // Contract ID of the lender
         lenderId: lenderDetails.lenderId, // Lender ID to be sent to the backend
+        borrowerUserEmail: session?.user?.email, // Borrower ID fetched from session
         borrowAmount, // Borrow amount entered by the user
         pendingAmount: borrowAmount, // Initially, pending amount is the same as borrow amount
         lastTransactionDetails: `Borrowed ${borrowAmount} units`, // Transaction details
