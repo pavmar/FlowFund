@@ -350,7 +350,6 @@ app.get('/api/lenders', async (req, res) => {
 //     res.status(500).json({ error: 'Failed to create borrow request' });
 //   }
 // });
-
 app.post('/api/borrow', async (req, res) => {
   const { contractId, lenderId, borrowerUserEmail, borrowAmount, pendingAmount, lastTransactionDetails } = req.body;
 
@@ -367,6 +366,20 @@ app.post('/api/borrow', async (req, res) => {
 
     // Log the validation success
     console.log('Validation successful');
+
+    // Find the user by borrowerUserEmail
+    const user = await User.findOne({ userEmail: borrowerUserEmail });
+    if (!user) {
+      console.error('Borrower not found with email:', borrowerUserEmail);
+      return res.status(404).json({ error: 'Borrower not found' });
+    }
+
+    // Update the isBorrower field to true
+    if (!user.isBorrower) {
+      user.isBorrower = true;
+      await user.save();
+      console.log('User updated to borrower:', user);
+    }
 
     // Create a new Borrow record
     const borrow = new Borrow({
