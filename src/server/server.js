@@ -67,19 +67,7 @@ const borrowSchema = new mongoose.Schema({
 
 const Borrow = mongoose.model('Borrow', borrowSchema);
 
-// Transaction Schema
-const transactionSchema = new mongoose.Schema({
-  transactionId: { type: String, unique: true, default: () => `txn_${Date.now()}` },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  transactionType: { type: String, enum: ['borrow', 'installment'], required: true },
-  transactionAmount: { type: Number, required: true },
-  transactionDate: { type: Date, default: Date.now },
-  secondPartyId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  lastPaidTimestamp: { type: Date, default: null },
-  comment: { type: String, default: null },
-});
 
-const Transaction = mongoose.model('Transaction', transactionSchema);
 
 // Routes
 // api changes starts here
@@ -427,29 +415,6 @@ app.post('/api/borrow', async (req, res) => {
 });
 
 
-app.post('/api/transaction', async (req, res) => {
-  const { userId, transactionType, transactionAmount, secondPartyId, comment } = req.body;
-
-  try {
-    if (!userId || !transactionType || !transactionAmount || !secondPartyId) {
-      return res.status(400).json({ error: 'All fields are required' });
-    }
-
-    const transaction = new Transaction({
-      userId,
-      transactionType,
-      transactionAmount,
-      secondPartyId,
-      comment,
-    });
-
-    await transaction.save();
-    res.status(201).json({ message: 'Transaction recorded successfully', transaction });
-  } catch (error) {
-    console.error('Error recording transaction:', error);
-    res.status(500).json({ error: 'Failed to record transaction' });
-  }
-});
 
 // Start server
 const PORT = process.env.PORT || 9090;
