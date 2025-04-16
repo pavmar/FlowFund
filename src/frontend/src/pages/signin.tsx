@@ -1,6 +1,5 @@
 'use client';
 import * as React from 'react';
-import Alert from '@mui/material/Alert';
 import LinearProgress from '@mui/material/LinearProgress';
 import Button from '@mui/material/Button';
 import { SignInPage } from '@toolpad/core/SignInPage';
@@ -27,6 +26,7 @@ export default function SignIn() {
         let result;
         try {
           if (provider.id === 'google') {
+            console.log('Attempting Google sign-in...');
             result = await signInWithGoogle();
           }
 
@@ -35,26 +35,48 @@ export default function SignIn() {
             const password = formData?.get('password') as string;
 
             if (!email || !password) {
+              console.error('Email and password are required');
               return { error: 'Email and password are required' };
             }
 
+            console.log('Attempting credentials sign-in...');
             result = await signInWithCredentials(email, password);
           }
 
           if (result?.success && result?.user) {
+            console.log('Sign-in successful.');
             const userSession: Session = {
               user: {
-                name: result.user.displayName || '',
-                email: result.user.email || '',
-                image: result.user.photoURL || '',
+                email: result.user.email,
               },
             };
             setSession(userSession);
+
+            // Update login activity in the backend
+            try {
+              const loginResponse = await fetch('http://localhost:9090/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: result.user.email }),
+              });
+
+              if (!loginResponse.ok) {
+                const errorText = await loginResponse.text();
+                console.error('Failed to update last login in the backend:', errorText);
+              } else {
+                console.log('Last login updated successfully in the backend.');
+              }
+            } catch (error) {
+              console.error('Error while updating last login in the backend:', error);
+            }
+
             navigate(callbackUrl || '/', { replace: true });
             return {};
           }
+          console.error('Sign-in failed:', result?.error || 'Unknown error');
           return { error: result?.error || 'Failed to sign in' };
         } catch (error) {
+          console.error('An error occurred during sign-in:', error);
           return { error: error instanceof Error ? error.message : 'An error occurred' };
         }
       }}
@@ -68,7 +90,7 @@ export default function SignIn() {
           >
             Sign Up
           </Button>
-        )
+        ),
       }}
     />
   );
