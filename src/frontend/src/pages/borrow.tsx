@@ -2,7 +2,7 @@ import * as React from 'react';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
-import { Card, CardContent, Button, Radio, RadioGroup, FormControlLabel } from '@mui/material';
+import { Card, CardContent, Button, Radio, RadioGroup, FormControlLabel, TextField } from '@mui/material';
 import axios from 'axios';
 import { useSession } from '../SessionContext'; // Import the session context
 
@@ -12,6 +12,8 @@ export default function BorrowPage() {
 
   const [lenders, setLenders] = React.useState([]);
   const [selectedLender, setSelectedLender] = React.useState<string | null>(null);
+  const [borrowAmount, setBorrowAmount] = React.useState<number | ''>('');
+  const [showBorrowForm, setShowBorrowForm] = React.useState(false);
 
   // Fetch lenders from the database
   React.useEffect(() => {
@@ -30,52 +32,29 @@ export default function BorrowPage() {
 
   const handleSelectLender = (lenderId: string) => {
     setSelectedLender(lenderId);
+    setShowBorrowForm(true); // Show the borrow form when a lender is selected
   };
 
-  const handleBorrow = async () => {
+  const handleBorrowSubmit = () => {
     if (!selectedLender) {
-      alert('Please select a lender to borrow from.');
+      alert('No lender selected.');
       return;
     }
-
-    if (!userEmail) {
-      alert('User email not found. Please log in again.');
-      return;
-    }
-
-    // Find the selected lender's details
+  
     const lenderDetails = lenders.find((lender: any) => lender._id === selectedLender);
     if (!lenderDetails) {
       alert('Selected lender details not found.');
       return;
     }
-
-    const amountToBorrow = lenderDetails.minBorrowAmount || 0; // Use the lender's minimum borrow amount
-    const tenureDays = lenderDetails.durationDays || 0; // Use the lender's duration
-    const interestRate = lenderDetails.interestRate || 0; // Use the lender's interest rate
-
-    const borrowRequestPayload = {
-      lenderId: selectedLender,
-      borrowerEmail: userEmail,
-      amount: amountToBorrow,
-      interestRate,
-      tenureDays,
-    };
-
-    console.log('Borrow request payload:', borrowRequestPayload); // Log the payload
-
-    try {
-      const response = await axios.post('http://localhost:9090/api/borrow', borrowRequestPayload);
-      console.log('Borrow response:', response.data); // Log the response
-
-      if (response.status === 201) {
-        alert('Borrow request submitted successfully!');
-        setSelectedLender(null); // Clear the selection after submission
-      }
-    } catch (error) {
-      console.error('Error submitting borrow request:', error); // Log the error
-      alert('Failed to submit borrow request.');
+  
+    if (borrowAmount > lenderDetails.lendingAmountBalance) {
+      alert('Borrow amount cannot exceed the lender\'s available balance.');
+      return;
     }
+  
+    alert('Borrow request submitted successfully!');
+    setBorrowAmount(''); // Clear the borrow amount after submission
+    setShowBorrowForm(false); // Hide the borrow form after submission
   };
 
   return (
@@ -92,10 +71,13 @@ export default function BorrowPage() {
                   Interest Rate: {lender.interestRate ?? 'N/A'}%
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Amount: {lender.minBorrowAmount ?? 'N/A'} USD
+                  Amount: {lender.minBorrowAmount ?? 'N/A'} units
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Duration: {lender.durationDays ?? 'N/A'} days
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Available Balance: {lender.lendingAmountBalance ?? 'N/A'} units
                 </Typography>
                 <RadioGroup
                   value={selectedLender}
@@ -112,16 +94,32 @@ export default function BorrowPage() {
           </Grid>
         ))}
       </Grid>
-      <Box sx={{ mt: 2, textAlign: 'center' }}>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleBorrow}
-          disabled={!selectedLender}
-        >
-          Borrow
-        </Button>
-      </Box>
+      {showBorrowForm && (
+        <Box sx={{ mt: 4, textAlign: 'center' }}>
+          <Typography variant="h6" gutterBottom>
+            Enter Borrow Amount
+          </Typography>
+          <TextField
+            id="borrowAmount"
+            label="Borrow Amount"
+            type="number"
+            variant="outlined"
+            value={borrowAmount}
+            onChange={(e) => setBorrowAmount(Number(e.target.value))}
+            sx={{ mb: 2, width: '300px' }}
+          />
+          <Box>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleBorrowSubmit}
+              disabled={!borrowAmount || borrowAmount <= 0}
+            >
+              Submit
+            </Button>
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 }
