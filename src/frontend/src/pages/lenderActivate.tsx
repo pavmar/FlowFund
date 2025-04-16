@@ -1,3 +1,137 @@
+// import * as React from 'react';
+// import Box from '@mui/material/Box';
+// import TextField from '@mui/material/TextField';
+// import Button from '@mui/material/Button';
+// import axios from 'axios';
+// import { useSession } from '../SessionContext'; // Assuming you have a session context
+
+// export default function LenderActivatePage() {
+//   const { session } = useSession(); // Retrieve session data
+//   const email = session?.user?.email; // Get the logged-in user's email
+
+//   const [formData, setFormData] = React.useState({
+//     interest: '',
+//     amount: '',
+//     duration: '',
+//     collateralAddress: '', // Added collateralAddress field
+//     collateral: '',
+//   });
+
+//   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+//     const { id, value } = e.target;
+//     setFormData((prev) => ({ ...prev, [id]: value }));
+//   };
+
+
+//   const handleSubmit = async (e: React.FormEvent) => {
+//     e.preventDefault();
+//     if (!email) {
+//       alert('User email not found in session.');
+//       return;
+//     }
+  
+//     // Log the data being sent to the backend
+//     console.log('Data being sent to backend:', {
+//       email,
+//       interestRate: parseFloat(formData.interest),
+//       durationDays: parseInt(formData.duration, 10),
+//       minBorrowAmount: parseFloat(formData.amount),
+//       collateralAddress: formData.collateralAddress,
+//       collateral: formData.collateral,
+//     });
+  
+//     try {
+//       const response = await axios.post('http://localhost:9090/api/lender/activate', {
+//         email, // Pass the user email
+//         interestRate: parseFloat(formData.interest),
+//         durationDays: parseInt(formData.duration, 10),
+//         minBorrowAmount: parseFloat(formData.amount),
+//         collateralAddress: formData.collateralAddress,
+//         collateral: formData.collateral,
+//       });
+  
+//       if (response.status === 200 || response.status === 201) {
+//         alert('Lender activated successfully!');
+//         setFormData({ interest: '', amount: '', duration: '', collateralAddress: '', collateral: '' }); // Clear form fields
+//       }
+//     } catch (error: any) {
+//       console.error('Error response from backend:', error.response?.data || error.message);
+//       if (error.response && error.response.status === 404) {
+//         alert('User not found. Please ensure the email is correct.');
+//       } else if (error.response && error.response.data.error) {
+//         alert(error.response.data.error); // Display the error message from the backend
+//       } else {
+//         alert('Failed to activate lender.');
+//       }
+//     }
+//   };
+
+
+//   return (
+//     <Box
+//       component="form"
+//       sx={{ '& > :not(style)': { m: 1, width: '25ch' } }}
+//       noValidate
+//       autoComplete="off"
+//       onSubmit={handleSubmit}
+//     >
+//       <TextField
+//         id="interest"
+//         label="Interest"
+//         variant="filled"
+//         value={formData.interest}
+//         onChange={handleChange}
+//         required
+//       />
+//       <TextField
+//         id="amount"
+//         label="Amount"
+//         variant="filled"
+//         value={formData.amount}
+//         onChange={handleChange}
+//         required
+//       />
+//       <TextField
+//         id="duration"
+//         label="Duration"
+//         variant="filled"
+//         value={formData.duration}
+//         onChange={handleChange}
+//         required
+//       />
+//       <TextField
+//         id="collateralAddress"
+//         label="Collateral Address" // Added collateralAddress field
+//         variant="filled"
+//         value={formData.collateralAddress}
+//         onChange={handleChange}
+//         required
+//       />
+//       <TextField
+//         id="collateral"
+//         label="Collateral"
+//         variant="filled"
+//         value={formData.collateral}
+//         onChange={handleChange}
+//         required
+//       />
+// =     <Box
+//   sx={{
+//     display: 'flex',
+//     justifyContent: 'flex-end', // Aligns the button to the right
+//     mt: 4, // Adds more margin-top for spacing
+//     pr: 2, // Adds padding-right to move the button slightly inward
+//   }}
+// >
+//   <Button type="submit" variant="contained" color="primary">
+//     Submit
+//   </Button>
+// </Box>
+//     </Box>
+//   );
+// }
+
+
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -13,15 +147,42 @@ export default function LenderActivatePage() {
     interest: '',
     amount: '',
     duration: '',
-    collateralAddress: '', // Added collateralAddress field
+    collateralAddress: '',
     collateral: '',
   });
+
+  const [isLender, setIsLender] = React.useState(false);
+
+  React.useEffect(() => {
+    const fetchLenderDetails = async () => {
+      if (!email) return;
+
+      try {
+        const response = await axios.get('http://localhost:9090/api/lender/details', {
+          params: { email },
+        });
+
+        const { lender } = response.data;
+        setIsLender(true);
+        setFormData({
+          interest: lender.interestRate.toString(),
+          amount: lender.minBorrowAmount.toString(),
+          duration: lender.durationDays.toString(),
+          collateralAddress: lender.collateralAddress,
+          collateral: lender.collateral,
+        });
+      } catch (error: any) {
+        console.error('Error fetching lender details:', error.response?.data || error.message);
+      }
+    };
+
+    fetchLenderDetails();
+  }, [email]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,44 +190,26 @@ export default function LenderActivatePage() {
       alert('User email not found in session.');
       return;
     }
-  
-    // Log the data being sent to the backend
-    console.log('Data being sent to backend:', {
-      email,
-      interestRate: parseFloat(formData.interest),
-      durationDays: parseInt(formData.duration, 10),
-      minBorrowAmount: parseFloat(formData.amount),
-      collateralAddress: formData.collateralAddress,
-      collateral: formData.collateral,
-    });
-  
+
     try {
       const response = await axios.post('http://localhost:9090/api/lender/activate', {
-        email, // Pass the user email
+        email,
         interestRate: parseFloat(formData.interest),
         durationDays: parseInt(formData.duration, 10),
         minBorrowAmount: parseFloat(formData.amount),
         collateralAddress: formData.collateralAddress,
         collateral: formData.collateral,
       });
-  
+
       if (response.status === 200 || response.status === 201) {
-        alert('Lender activated successfully!');
-        setFormData({ interest: '', amount: '', duration: '', collateralAddress: '', collateral: '' }); // Clear form fields
+        alert('Lender account updated successfully!');
       }
     } catch (error: any) {
       console.error('Error response from backend:', error.response?.data || error.message);
-      if (error.response && error.response.status === 404) {
-        alert('User not found. Please ensure the email is correct.');
-      } else if (error.response && error.response.data.error) {
-        alert(error.response.data.error); // Display the error message from the backend
-      } else {
-        alert('Failed to activate lender.');
-      }
+      alert(error.response?.data?.error || 'Failed to update lender account.');
     }
   };
 
-  
   return (
     <Box
       component="form"
@@ -101,7 +244,7 @@ export default function LenderActivatePage() {
       />
       <TextField
         id="collateralAddress"
-        label="Collateral Address" // Added collateralAddress field
+        label="Collateral Address"
         variant="filled"
         value={formData.collateralAddress}
         onChange={handleChange}
@@ -115,18 +258,18 @@ export default function LenderActivatePage() {
         onChange={handleChange}
         required
       />
-=     <Box
-  sx={{
-    display: 'flex',
-    justifyContent: 'flex-end', // Aligns the button to the right
-    mt: 4, // Adds more margin-top for spacing
-    pr: 2, // Adds padding-right to move the button slightly inward
-  }}
->
-  <Button type="submit" variant="contained" color="primary">
-    Submit
-  </Button>
-</Box>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          mt: 4,
+          pr: 2,
+        }}
+      >
+        <Button type="submit" variant="contained" color="primary">
+          {isLender ? 'Update' : 'Submit'}
+        </Button>
+      </Box>
     </Box>
   );
 }

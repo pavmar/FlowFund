@@ -144,6 +144,60 @@ app.post('/api/auth/login', async (req, res) => {
     res.status(500).json({ error: 'Failed to update login timestamp' });
   }
 });
+
+// app.post('/api/lender/activate', async (req, res) => {
+//   const { email, interestRate, durationDays, minBorrowAmount, collateralAddress, collateral } = req.body;
+
+//   try {
+//     console.log('POST /api/lender/activate called');
+//     console.log('Request body received:', req.body);
+
+//     if (!email) {
+//       return res.status(400).json({ error: 'Email is required' });
+//     }
+
+//     // Find the user by email
+//     const user = await User.findOne({ userEmail: email });
+//     console.log('User found in database:', user);
+
+//     if (!user) {
+//       return res.status(404).json({ error: 'User not found' });
+//     }
+
+//     // Update the user's isLender field
+//     user.isLender = true;
+//     await user.save();
+//     console.log('User updated to lender:', user);
+
+//     // Create a new lender record
+//     const lender = new Lender({
+//       contractId: `contract_${Date.now()}`,
+//       lenderId: user._id,
+//       lendingConditions: `Interest: ${interestRate}%, Duration: ${durationDays} days`,
+//       initialLendingCapacity: minBorrowAmount,
+//       lendingAmountBalance: minBorrowAmount,
+//       currentBalance: minBorrowAmount,
+//       borrowerCount: 0,
+//       interestRate,
+//       durationDays,
+//       minBorrowAmount,
+//       collateralAddress,
+//       collateral,
+//     });
+
+//     await lender.save();
+//     console.log('Lender record created:', lender);
+
+//     res.status(201).json({ message: 'Lender account activated successfully', lender });
+//   } catch (error) {
+//     console.error('Error activating lender account:', error.stack || error.message || error);
+//     res.status(500).json({ error: 'Failed to activate lender account' });
+//   }
+// });
+
+// api changes ends her
+
+
 app.post('/api/lender/activate', async (req, res) => {
   const { email, interestRate, durationDays, minBorrowAmount, collateralAddress, collateral } = req.body;
 
@@ -157,35 +211,48 @@ app.post('/api/lender/activate', async (req, res) => {
 
     // Find the user by email
     const user = await User.findOne({ userEmail: email });
-    console.log('User found in database:', user);
-
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Update the user's isLender field
-    user.isLender = true;
-    await user.save();
-    console.log('User updated to lender:', user);
+    if (!user.isLender) {
+      // Update the user's isLender field if they are not already a lender
+      user.isLender = true;
+      await user.save();
+      console.log('User updated to lender:', user);
+    }
 
-    // Create a new lender record
-    const lender = new Lender({
-      contractId: `contract_${Date.now()}`,
-      lenderId: user._id,
-      lendingConditions: `Interest: ${interestRate}%, Duration: ${durationDays} days`,
-      initialLendingCapacity: minBorrowAmount,
-      lendingAmountBalance: minBorrowAmount,
-      currentBalance: minBorrowAmount,
-      borrowerCount: 0,
-      interestRate,
-      durationDays,
-      minBorrowAmount,
-      collateralAddress,
-      collateral,
-    });
-
-    await lender.save();
-    console.log('Lender record created:', lender);
+    // Check if the lender record already exists
+    let lender = await Lender.findOne({ lenderId: user._id });
+    if (lender) {
+      // Update existing lender record
+      lender.interestRate = interestRate;
+      lender.durationDays = durationDays;
+      lender.minBorrowAmount = minBorrowAmount;
+      lender.collateralAddress = collateralAddress;
+      lender.collateral = collateral;
+      lender.lendingConditions = `Interest: ${interestRate}%, Duration: ${durationDays} days`;
+      await lender.save();
+      console.log('Lender record updated:', lender);
+    } else {
+      // Create a new lender record
+      lender = new Lender({
+        contractId: `contract_${Date.now()}`,
+        lenderId: user._id,
+        lendingConditions: `Interest: ${interestRate}%, Duration: ${durationDays} days`,
+        initialLendingCapacity: minBorrowAmount,
+        lendingAmountBalance: minBorrowAmount,
+        currentBalance: minBorrowAmount,
+        borrowerCount: 0,
+        interestRate,
+        durationDays,
+        minBorrowAmount,
+        collateralAddress,
+        collateral,
+      });
+      await lender.save();
+      console.log('Lender record created:', lender);
+    }
 
     res.status(201).json({ message: 'Lender account activated successfully', lender });
   } catch (error) {
@@ -194,7 +261,47 @@ app.post('/api/lender/activate', async (req, res) => {
   }
 });
 
-// api changes ends her
+
+app.get('/api/lender/details', async (req, res) => {
+  const { email } = req.query;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Find the user by email
+    const user = await User.findOne({ userEmail: email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!user.isLender) {
+      return res.status(400).json({ error: 'User is not a lender' });
+    }
+
+    // Find the lender details
+    const lender = await Lender.findOne({ lenderId: user._id });
+    if (!lender) {
+      return res.status(404).json({ error: 'Lender details not found' });
+    }
+
+    res.status(200).json({ user, lender });
+  } catch (error) {
+    console.error('Error fetching lender details:', error);
+    res.status(500).json({ error: 'Failed to fetch lender details' });
+  }
+});
+
+app.get('/api/lenders', async (req, res) => {
+  try {
+    const lenders = await Lender.find({});
+    res.status(200).json(lenders);
+  } catch (error) {
+    console.error('Error fetching lenders:', error);
+    res.status(500).json({ error: 'Failed to fetch lenders' });
+  }
+});
 
 
 app.post('/api/borrow', async (req, res) => {
