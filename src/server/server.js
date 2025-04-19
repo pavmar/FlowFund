@@ -415,6 +415,83 @@ app.post('/api/borrow', async (req, res) => {
 });
 
 
+// app.post('/api/user/updateCollateral', async (req, res) => {
+//   const { email, collateralAddress, collateralAmount } = req.body;
+
+//   try {
+//     if (!email) {
+//       return res.status(400).json({ error: 'Email is required' });
+//     }
+
+//     // Find the user by email
+//     const user = await User.findOne({ userEmail: email });
+//     if (!user) {
+//       return res.status(404).json({ error: 'User not found' });
+//     }
+
+//     // Update collateral details
+//     user.collateralAddress = collateralAddress || user.collateralAddress;
+//     user.collateralAmount = collateralAmount || user.collateralAmount;
+//     await user.save();
+
+//     console.log('User collateral updated:', user);
+//     res.status(200).json({ message: 'Collateral updated successfully', user });
+//   } catch (error) {
+//     console.error('Error updating collateral:', error);
+//     res.status(500).json({ error: 'Failed to update collateral' });
+//   }
+// });
+
+app.post('/api/user/updateCollateral', async (req, res) => {
+  const { email, collateralAddress, collateralAmount } = req.body;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Find the user by email
+    const user = await User.findOne({ userEmail: email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update collateral details
+    user.collateralAddress = collateralAddress || user.collateralAddress;
+    user.collateralAmount = collateralAmount || user.collateralAmount;
+    await user.save();
+
+    console.log('User collateral updated:', user);
+    res.status(200).json({ message: 'Collateral updated successfully', user });
+  } catch (error) {
+    console.error('Error updating collateral:', error);
+    res.status(500).json({ error: 'Failed to update collateral' });
+  }
+});
+
+
+app.get('/api/user/details', async (req, res) => {
+  const { email } = req.query;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const user = await User.findOne({ userEmail: email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({
+      collateralAddress: user.collateralAddress,
+      collateralAmount: user.collateralAmount,
+    });
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    res.status(500).json({ error: 'Failed to fetch user details' });
+  }
+});
 
 // Start server
 const PORT = process.env.PORT || 9090;
