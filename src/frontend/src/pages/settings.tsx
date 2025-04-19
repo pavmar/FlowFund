@@ -3,21 +3,30 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
+import axios from 'axios';
+import { useSession } from '../SessionContext'; // Import SessionContext
 
 export default function SettingsPage() {
+  const { session } = useSession(); // Access session context
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [error, setError] = React.useState('');
+  const [collateralAddress, setCollateralAddress] = React.useState('');
+  const [collateralAmount, setCollateralAmount] = React.useState('');
+  const [collateralError, setCollateralError] = React.useState('');
+  const [successMessage, setSuccessMessage] = React.useState('');
 
   const handleUpdatePassword = () => {
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
     } else {
       setError('');
-      // Add logic to handle password update
       console.log('Password updated successfully');
+      // Add logic to update the password
     }
   };
+
+ 
 
   return (
     <Box sx={{ padding: 2 }}>
@@ -55,15 +64,7 @@ export default function SettingsPage() {
         </Button>
       </Box>
 
-      {/* Add Profile Picture */}
-      <Box sx={{ marginBottom: 2 }}>
-        <Typography variant="h6">Add Profile Picture</Typography>
-        <Button variant="contained" component="label">
-          Upload Picture
-          <input type="file" hidden />
-        </Button>
-      </Box>
-
+     
       {/* Add Address */}
       <Box sx={{ marginBottom: 2 }}>
         <Typography variant="h6">Add Address</Typography>
