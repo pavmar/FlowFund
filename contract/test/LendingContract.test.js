@@ -3,11 +3,11 @@ const { ethers } = require("hardhat");
 
 describe("LendingContract", function () {
   let lendingContract;
-  let owner, lender, borrower;
+  let owner, lender, borrower, addr1;
 
   beforeEach(async function () {
     // Get signers
-    [owner, lender, borrower] = await ethers.getSigners();
+    [owner, lender, borrower, addr1] = await ethers.getSigners();
 
     // Deploy the LendingContract
     const LendingContract = await ethers.getContractFactory("LendingContract");
@@ -96,5 +96,38 @@ describe("LendingContract", function () {
     await expect(
       lenderContract.lend({ value: 0 })
     ).to.be.revertedWith("Must send ETH to lend");
+  });
+
+  it("should allow a user to repay ETH and update their balance", async function () {
+    // addr1 lends 1 ETH
+    await lendingContract.connect(addr1).lend({ value: ethers.parseEther("1") });
+
+    // Check initial balance
+    let balance = await lendingContract.balances(addr1.address);
+    expect(balance).to.equal(ethers.parseEther("1"));
+
+    // addr1 repays 0.5 ETH
+    await lendingContract.connect(addr1).repay({ value: ethers.parseEther("0.5") });
+
+    // Check updated balance
+    balance = await lendingContract.balances(addr1.address);
+    expect(balance).to.equal(ethers.parseEther("0.5"));
+  });
+
+  it("should revert if the repay amount exceeds the user's balance", async function () {
+    // addr1 lends 1 ETH
+    await lendingContract.connect(addr1).lend({ value: ethers.parseEther("1") });
+
+    // Attempt to repay 1.5 ETH (more than the balance)
+    await expect(
+      lendingContract.connect(addr1).repay({ value: ethers.parseEther("1.5") })
+    ).to.be.revertedWith("Repay amount exceeds balance");
+  });
+
+  it("should revert if the repay amount is zero", async function () {
+    // addr1 attempts to repay 0 ETH
+    await expect(
+      lendingContract.connect(addr1).repay({ value: ethers.parseEther("0") })
+    ).to.be.revertedWith("Must send ETH to repay");
   });
 });

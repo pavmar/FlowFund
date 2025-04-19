@@ -24,6 +24,12 @@ contract LendingContract {
         payable(msg.sender).transfer(amount);
     }
 
+    function repay() external payable {
+        require(msg.value > 0, "Must send ETH to repay");
+        require(balances[msg.sender] >= msg.value, "Repay amount exceeds balance");
+        balances[msg.sender] -= msg.value;
+    }
+
     // Allow the contract to accept plain ETH transfers
     receive() external payable {}
 }
