@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -20,6 +19,8 @@ export default function BorrowPage() {
   const [isEditingCollateral, setIsEditingCollateral] = React.useState(false);
   const [collateralError, setCollateralError] = React.useState('');
   const [successMessage, setSuccessMessage] = React.useState('');
+  const [borrowError, setBorrowError] = React.useState(''); // Error message for borrow amount
+  const [lenderValidationError, setLenderValidationError] = React.useState(''); // Error for lender's available balance validation
 
   // Fetch user collateral details
   React.useEffect(() => {
@@ -42,17 +43,17 @@ export default function BorrowPage() {
   }, [userEmail]);
 
   // Fetch lenders from the database
-  React.useEffect(() => {
-    const fetchLenders = async () => {
-      try {
-        const response = await axios.get('http://localhost:9090/api/lenders'); // Backend endpoint to fetch lenders
-        setLenders(response.data);
-      } catch (error) {
-        console.error('Error fetching lenders:', error);
-        alert('Failed to fetch lenders. Please try again later.');
-      }
-    };
+  const fetchLenders = async () => {
+    try {
+      const response = await axios.get('http://localhost:9090/api/lenders'); // Backend endpoint to fetch lenders
+      setLenders(response.data);
+    } catch (error) {
+      console.error('Error fetching lenders:', error);
+      alert('Failed to fetch lenders. Please try again later.');
+    }
+  };
 
+  React.useEffect(() => {
     fetchLenders();
   }, []);
 
@@ -88,23 +89,33 @@ export default function BorrowPage() {
     setSelectedLender(lenderId);
     setShowBorrowForm(true); // Show the borrow form when a lender is selected
     const selectedLenderDetails = lenders.find((lender: any) => lender._id === lenderId);
+
+    // Reset validation errors when a new lender is selected
+    setBorrowError('');
+    setLenderValidationError('');
+
     console.log('Selected Lender Details:', selectedLenderDetails);
   };
 
   const handleBorrowSubmit = async () => {
     if (!selectedLender) {
-      alert('No lender selected.');
+      setBorrowError('No lender selected.');
       return;
     }
 
     const lenderDetails = lenders.find((lender: any) => lender._id === selectedLender);
     if (!lenderDetails) {
-      alert('Selected lender details not found.');
+      setBorrowError('Selected lender details not found.');
       return;
     }
 
     if (borrowAmount > lenderDetails.currentBalance) {
-      alert('Borrow amount cannot exceed the lender\'s available balance.');
+      setLenderValidationError('Borrow amount cannot exceed the selected lender\'s available balance.');
+      return;
+    }
+
+    if (collateralAmount && borrowAmount > collateralAmount / 2) {
+      setBorrowError('Borrow amount cannot exceed half of your collateral amount.');
       return;
     }
 
@@ -125,10 +136,13 @@ export default function BorrowPage() {
         alert('Borrow request submitted successfully!');
         setBorrowAmount(''); // Clear the borrow amount after submission
         setShowBorrowForm(false); // Hide the borrow form after submission
+        setBorrowError(''); // Clear any previous error
+        setLenderValidationError(''); // Clear lender validation error
+        fetchLenders(); // Refetch the list of lenders
       }
     } catch (error) {
       console.error('Error submitting borrow request:', error);
-      alert('Failed to submit borrow request.');
+      setBorrowError('Failed to submit borrow request.');
     }
   };
 
@@ -312,15 +326,47 @@ export default function BorrowPage() {
             type="number"
             variant="outlined"
             value={borrowAmount}
-            onChange={(e) => setBorrowAmount(Number(e.target.value))}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              setBorrowAmount(value);
+
+              const lenderDetails = lenders.find((lender: any) => lender._id === selectedLender);
+
+              if (lenderDetails && value > lenderDetails.currentBalance) {
+                setLenderValidationError('Borrow amount cannot exceed the selected lender\'s available balance.');
+              } else {
+                setLenderValidationError('');
+              }
+
+              if (collateralAmount && value > collateralAmount / 2) {
+                setBorrowError('Borrow amount cannot exceed half of your collateral amount.');
+              } else {
+                setBorrowError('');
+              }
+            }}
             sx={{ mb: 2, width: '300px' }}
           />
+          {borrowError && (
+            <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+              {borrowError}
+            </Typography>
+          )}
+          {lenderValidationError && (
+            <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+              {lenderValidationError}
+            </Typography>
+          )}
           <Box>
             <Button
               variant="contained"
               color="primary"
               onClick={handleBorrowSubmit}
-              disabled={!borrowAmount || borrowAmount <= 0}
+              disabled={
+                !borrowAmount ||
+                borrowAmount <= 0 ||
+                !!borrowError ||
+                !!lenderValidationError
+              }
             >
               Submit
             </Button>
