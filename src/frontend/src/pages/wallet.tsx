@@ -7,6 +7,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
+import Web3 from 'web3';
 
 export default function WalletPage() {
   const [error, setError] = React.useState<string | null>(null);
@@ -29,7 +30,7 @@ export default function WalletPage() {
         setWalletAddress(account);
 
         // Use ethers.js to connect to the provider
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const provider = new ethers.providers.Web3Provider(window.ethereum as ethers.providers.ExternalProvider);
 
         // Fetch the balance of the connected account
         const balanceInWei = await provider.getBalance(account);
@@ -46,7 +47,7 @@ export default function WalletPage() {
     fetchAccountsAndBalance();
   }, []);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!sendAmount || isNaN(Number(sendAmount)) || Number(sendAmount) <= 0) {
       alert('Please enter a valid amount to send.');
       return;
@@ -55,7 +56,47 @@ export default function WalletPage() {
       alert('Please enter a valid recipient address.');
       return;
     }
-    alert(`Send functionality is not implemented yet. Amount: ${sendAmount} ETH, Recipient: ${recipientAddress}`);
+
+    if (!window.ethereum) {
+      alert('MetaMask is not installed. Please install MetaMask and try again.');
+      return;
+    }
+
+    try {
+      // Request account access if needed
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+      // Create a Web3 instance
+      const web3 = new Web3(window.ethereum);
+
+      // Get the connected account
+      const accounts = await web3.eth.getAccounts();
+      const senderAddress = accounts[0];
+
+      // Convert the amount to Wei (smallest unit of Ether)
+      const amountInWei = web3.utils.toWei(sendAmount, 'ether');
+
+      // Send the transaction
+      const transactionHash = await web3.eth.sendTransaction({
+        from: senderAddress, // Sender's address
+        to: recipientAddress, // Recipient's address
+        value: amountInWei, // Amount to send in Wei
+      });
+
+      alert(`Transaction successful! Hash: ${transactionHash.transactionHash}`);
+
+      // Clear the input fields after successful transaction
+      setSendAmount('');
+      setRecipientAddress('');
+
+      // Fetch the updated balance
+      const balanceInWei = await web3.eth.getBalance(senderAddress);
+      const balanceInEth = web3.utils.fromWei(balanceInWei, 'ether');
+      setBalance(parseFloat(balanceInEth).toFixed(4));
+    } catch (err) {
+      console.error('Error sending transaction:', err);
+      alert('Failed to send transaction. Please try again.');
+    }
   };
 
   const handleReceive = () => {
