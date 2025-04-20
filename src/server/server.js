@@ -10,6 +10,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const { ethers } = require('ethers');
+
 // MongoDB connection
 mongoose
   .connect('mongodb+srv://neelwanprashant:bMllontSe3A9cg8L@cluster0.fv0rl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
@@ -540,6 +542,17 @@ app.get('/api/user/walletDetails', async (req, res) => {
     //   return res.status(400).json({ error: 'Wallet details are missing' });
     // }
 
+     // Use ethers.js to fetch the wallet balance
+     const provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545/'); // Replace with your Infura project ID
+     const balanceInWei = await provider.getBalance(user.walletAddress);
+     const walletBalance = parseFloat(ethers.utils.formatEther(balanceInWei)).toFixed(4);
+ 
+     console.log(walletBalance);
+     // Update the wallet balance in the database
+     user.walletBalance = walletBalance;
+     await user.save();
+     console.log('Wallet balance updated in database:', walletBalance);
+
     const response = {
       walletAddress: user.walletAddress,
       walletBalance: user.walletBalance,
@@ -554,6 +567,52 @@ app.get('/api/user/walletDetails', async (req, res) => {
   }
 });
 
-// Start server
+//Start server
+
+// app.get('/api/user/walletDetails', async (req, res) => {
+//   const { email } = req.query;
+//   console.log('Request received for wallet details with email:', email); // Log the email from the request
+
+//   try {
+//     if (!email) {
+//       return res.status(400).json({ error: 'Email is required' });
+//     }
+
+//     const user = await User.findOne({ userEmail: email });
+//     console.log('User fetched from database:', user); // Log the user object
+
+//     if (!user) {
+//       return res.status(404).json({ error: 'User not found' });
+//     }
+
+//     if (!user.walletAddress) {
+//       return res.status(400).json({ error: 'Wallet address is missing' });
+//     }
+
+//     // Use ethers.js to fetch the wallet balance
+//     const provider = new ethers.providers.JsonRpcProvider('https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID'); // Replace with your Infura project ID
+//     const balanceInWei = await provider.getBalance(user.walletAddress);
+//     const walletBalance = parseFloat(ethers.utils.formatEther(balanceInWei)).toFixed(4);
+
+//     // Update the wallet balance in the database
+//     user.walletBalance = walletBalance;
+//     await user.save();
+//     console.log('Wallet balance updated in database:', walletBalance);
+
+//     // Prepare the response
+//     const response = {
+//       walletAddress: user.walletAddress,
+//       walletBalance,
+//     };
+//     console.log('Response being sent:', response); // Log the response being sent
+
+//     res.status(200).json(response);
+//   } catch (error) {
+//     console.error('Error fetching wallet details:', error);
+//     res.status(500).json({ error: 'Failed to fetch wallet details' });
+//   }
+// });
+
+
 const PORT = process.env.PORT || 9090;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
