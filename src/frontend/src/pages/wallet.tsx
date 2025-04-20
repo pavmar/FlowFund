@@ -1,51 +1,83 @@
 import * as React from 'react';
-import { MetaMaskUIProvider } from '@metamask/sdk-react-ui';
-import Metamask from './metamask';
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
-import Web3 from 'web3';
+import Box from '@mui/material/Box';
+import axios from 'axios';
+import { useSession } from '../SessionContext'; // Import the session context
 
 export default function WalletPage() {
-  const [error, setError] = React.useState<string | null>(null);
+  const { session } = useSession(); // Access the session context
+  const userEmail = session?.user?.email; // Retrieve the logged-in user's email
+
   const [walletAddress, setWalletAddress] = useState('');
-  const [balance, setBalance] = useState<string | null>(null);
-  const [sendAmount, setSendAmount] = useState(''); // State to store the amount to send
-  const [recipientAddress, setRecipientAddress] = useState(''); // State to store the recipient's wallet address
+  const [walletBalance, setWalletBalance] = useState<string | null>(null);
+  const [privateKey, setPrivateKey] = useState('');
+  const [sendAmount, setSendAmount] = useState('');
+  const [recipientAddress, setRecipientAddress] = useState('');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchAccountsAndBalance() {
-      if (!window.ethereum) {
-        setError('MetaMask is not installed. Please install MetaMask and try again.');
+    async function fetchUserWalletDetails() {
+      console.log('User email from session:', userEmail); // Log the user email
+
+      if (!userEmail) {
+        setError('User email not found in session.');
         return;
       }
 
       try {
-        // Request accounts from MetaMask
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const account = accounts[0];
-        setWalletAddress(account);
+        const response = await axios.get('http://localhost:9090/api/user/walletDetails', {
+          params: { email: userEmail },
+        });
 
-        // Use ethers.js to connect to the provider
-        const provider = new ethers.providers.Web3Provider(window.ethereum as ethers.providers.ExternalProvider);
+        const { walletAddress, walletBalance } = response.data;
 
-        // Fetch the balance of the connected account
-        const balanceInWei = await provider.getBalance(account);
-        const balanceInEth = ethers.utils.formatEther(balanceInWei);
-
-        setBalance(parseFloat(balanceInEth).toFixed(4));
-        setError(null); // Clear any previous errors
+        if (walletAddress) {
+          setWalletAddress(walletAddress);
+        }
+        if (walletBalance) {
+          setWalletBalance(walletBalance);
+        }
       } catch (err) {
-        console.error('Error fetching balance:', err);
-        setError('Failed to fetch wallet balance. Please try again.');
+        console.error('Error fetching wallet details:', err);
+        setError('Failed to fetch wallet details. Please try again.');
       }
     }
 
-    fetchAccountsAndBalance();
-  }, []);
+    fetchUserWalletDetails();
+  }, [userEmail]);
+
+  const handleStoreWalletDetails = async () => {
+    if (!userEmail) {
+      setErrorMessage('User email not found in session.');
+      return;
+    }
+
+    if (!walletAddress || !privateKey) {
+      setErrorMessage('Please fill in both wallet address and private key.');
+      return;
+    }
+
+    try {
+      const response = await axios.post('http://localhost:9090/api/user/addWalletDetails', {
+        email: userEmail, // Use the email from the session context
+        walletAddress,
+        privateKey,
+      });
+
+      setSuccessMessage('Wallet details stored successfully.');
+      setErrorMessage(null);
+    } catch (err) {
+      console.error('Error storing wallet details:', err);
+      setErrorMessage('Failed to store wallet details. Please try again.');
+      setSuccessMessage(null);
+    }
+  };
 
   const handleSend = async () => {
     if (!sendAmount || isNaN(Number(sendAmount)) || Number(sendAmount) <= 0) {
@@ -57,111 +89,117 @@ export default function WalletPage() {
       return;
     }
 
-    if (!window.ethereum) {
-      alert('MetaMask is not installed. Please install MetaMask and try again.');
-      return;
-    }
-
     try {
-      // Request account access if needed
-      await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const provider = new ethers.providers.JsonRpcProvider('http://localhost:8545'); // Replace with your Infura project ID
+      const wallet = new ethers.Wallet(privateKey, provider);
+      const amountInWei = ethers.utils.parseEther(sendAmount);
 
-      // Create a Web3 instance
-      const web3 = new Web3(window.ethereum);
+      const tx = {
+        to: recipientAddress,
+        value: amountInWei,
+      };
 
-      // Get the connected account
-      const accounts = await web3.eth.getAccounts();
-      const senderAddress = accounts[0];
+      const transactionResponse = await wallet.sendTransaction(tx);
+      await transactionResponse.wait();
 
-      // Convert the amount to Wei (smallest unit of Ether)
-      const amountInWei = web3.utils.toWei(sendAmount, 'ether');
+      alert(`Transaction successful! Hash: ${transactionResponse.hash}`);
 
-      // Send the transaction
-      const transactionHash = await web3.eth.sendTransaction({
-        from: senderAddress, // Sender's address
-        to: recipientAddress, // Recipient's address
-        value: amountInWei, // Amount to send in Wei
-      });
-
-      alert(`Transaction successful! Hash: ${transactionHash.transactionHash}`);
-
-      // Clear the input fields after successful transaction
       setSendAmount('');
       setRecipientAddress('');
-
-      // Fetch the updated balance
-      const balanceInWei = await web3.eth.getBalance(senderAddress);
-      const balanceInEth = web3.utils.fromWei(balanceInWei, 'ether');
-      setBalance(parseFloat(balanceInEth).toFixed(4));
     } catch (err) {
       console.error('Error sending transaction:', err);
       alert('Failed to send transaction. Please try again.');
     }
   };
 
-  const handleReceive = () => {
-    alert(`Your wallet address is: ${walletAddress}`);
-  };
-
   return (
-    <MetaMaskUIProvider
-      sdkOptions={{
-        dappMetadata: {
-          name: 'React Demo Button',
-          url: 'http://reactdemobutton.localhost',
-        },
-        checkInstallationImmediately: false,
-      }}
-    >
-      <Metamask />
+    <>
+      <Typography variant="h6">Wallet</Typography>
+
+      {/* Wallet Details Section */}
+      <Box
+        sx={{
+          marginBottom: 4,
+          padding: 2,
+          border: '1px solid #ccc',
+          borderRadius: 4,
+          textAlign: 'left',
+        }}
+      >
+        {walletAddress ? (
+          <>
+            <Typography variant="body1">Address: {walletAddress}</Typography>
+            <Typography variant="body1">Balance: {walletBalance || 'Fetching...'} ETH</Typography>
+          </>
+        ) : (
+          <>
+            <Typography variant="h6">Store Wallet Details</Typography>
+            <TextField
+              label="Wallet Address"
+              variant="outlined"
+              fullWidth
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
+              sx={{ marginBottom: 2 }}
+            />
+            <TextField
+              label="Private Key"
+              variant="outlined"
+              fullWidth
+              value={privateKey}
+              onChange={(e) => setPrivateKey(e.target.value)}
+              sx={{ marginBottom: 2 }}
+            />
+            <Button variant="contained" color="primary" onClick={handleStoreWalletDetails}>
+              Store Wallet Details
+            </Button>
+            {successMessage && (
+              <Typography variant="body1" color="success" sx={{ marginTop: 2 }}>
+                {successMessage}
+              </Typography>
+            )}
+            {errorMessage && (
+              <Typography variant="body1" color="error" sx={{ marginTop: 2 }}>
+                {errorMessage}
+              </Typography>
+            )}
+          </>
+        )}
+      </Box>
+
+      {/* Send Ethereum Section */}
       <Box
         sx={{
           marginTop: 4,
           padding: 2,
           border: '1px solid #ccc',
           borderRadius: 4,
-          maxWidth: 400,
-          margin: 'auto',
-          textAlign: 'left', // Align the box content to the left
+          textAlign: 'left',
         }}
       >
-        <Typography variant="h6">Wallet Balance</Typography>
-        {error ? (
-          <Typography variant="body1" color="error">
-            {error}
-          </Typography>
-        ) : balance !== null ? (
-          <Typography variant="body1">{balance} ETH</Typography>
-        ) : (
-          <Typography variant="body1">Fetching balance...</Typography>
-        )}
-        <Box sx={{ marginTop: 2 }}>
-          <TextField
-            label="Recipient Address"
-            variant="outlined"
-            fullWidth
-            value={recipientAddress}
-            onChange={(e) => setRecipientAddress(e.target.value)}
-            sx={{ marginBottom: 2 }}
-          />
-          <TextField
-            label="Amount to Send (ETH)"
-            variant="outlined"
-            fullWidth
-            value={sendAmount}
-            onChange={(e) => setSendAmount(e.target.value)}
-            sx={{ marginBottom: 2 }}
-          />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-            <Button variant="contained" color="primary" onClick={handleSend}>
-              Send
-            </Button>
-            <Button variant="contained" color="secondary" onClick={handleReceive}>
-              Receive
-            </Button>
-          </Box>
+        <Typography variant="h6">Send Ethereum</Typography>
+        <TextField
+          label="Recipient Address"
+          variant="outlined"
+          fullWidth
+          value={recipientAddress}
+          onChange={(e) => setRecipientAddress(e.target.value)}
+          sx={{ marginBottom: 2 }}
+        />
+        <TextField
+          label="Amount to Send (ETH)"
+          variant="outlined"
+          fullWidth
+          value={sendAmount}
+          onChange={(e) => setSendAmount(e.target.value)}
+          sx={{ marginBottom: 2 }}
+        />
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+          <Button variant="contained" color="primary" onClick={handleSend}>
+            Send
+          </Button>
         </Box>
       </Box>
-    </MetaMaskUIProvider>
+    </>
   );
 }

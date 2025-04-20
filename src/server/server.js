@@ -24,6 +24,7 @@ const userSchema = new mongoose.Schema({
   userEmail: { type: String, required: true, unique: true },
   walletAddress: { type: String, default: null },
   privateKey: { type: String, default: null },
+  walletBalance: { type: Number, default: 0 }, // New field for wallet balance
   isLender: { type: Boolean, default: false },
   isBorrower: { type: Boolean, default: false },
   lastLogin: { type: Date, default: Date.now },
@@ -490,6 +491,66 @@ app.get('/api/user/details', async (req, res) => {
   } catch (error) {
     console.error('Error fetching user details:', error);
     res.status(500).json({ error: 'Failed to fetch user details' });
+  }
+});
+
+
+app.post('/api/user/addWalletDetails', async (req, res) => {
+  const { email, walletAddress, privateKey } = req.body;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    let user = await User.findOne({ userEmail: email });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    user.walletAddress = walletAddress || user.walletAddress;
+    user.privateKey = privateKey || user.privateKey;
+    await user.save();
+
+    res.status(200).json({ message: 'Wallet details added successfully', user });
+  } catch (error) {
+    console.error('Error adding wallet details:', error);
+    res.status(500).json({ error: 'Failed to add wallet details' });
+  }
+});
+
+
+app.get('/api/user/walletDetails', async (req, res) => {
+  const { email } = req.query;
+  console.log(req.query)
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const user = await User.findOne({ userEmail: email });
+    console.log(user);
+    // if (!user) {
+    //   return res.status(404).json({ error: 'User not found' });
+    // }
+
+    // if (!user.walletAddress || !user.walletBalance) {
+    //   return res.status(400).json({ error: 'Wallet details are missing' });
+    // }
+
+    const response = {
+      walletAddress: user.walletAddress,
+      walletBalance: user.walletBalance,
+    };
+    console.log('Response being sent:', response); // Log the response being sent
+
+    res.status(200).json(response);
+
+  } catch (error) {
+    console.error('Error fetching wallet details:', error);
+    res.status(500).json({ error: 'Failed to fetch wallet details' });
   }
 });
 
