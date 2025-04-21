@@ -39,6 +39,7 @@ const User = mongoose.model('User', userSchema);
 const lenderSchema = new mongoose.Schema({
   contractId: { type: String, required: true }, // Dummy data for testnet
   lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  userEmail: { type: String, required: true }, // Add user email to the schema
   lendingConditions: { type: String, required: true },
   initialLendingCapacity: { type: Number, required: true },
   lendingAmount: { type: Number, required: true },
@@ -57,11 +58,17 @@ const Lender = mongoose.model('Lender', lenderSchema);
 const borrowSchema = new mongoose.Schema({
   contractId: { type: String, required: true },
   lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lender', required: true },
+  lenderEmail: { type: String, required: true }, // Add lender email to the schema
   borrowerUserEmail: { type: String, required: true }, // Store the borrower's email
   borrowAmount: { type: Number, required: true },
   borrowDate: { type: Date, default: Date.now },
   pendingAmount: { type: Number, required: true },
   lastTransactionDetails: { type: String, default: null },
+  collateral: {
+    ethereumNetwork: { type: String, required: true }, // Ethereum network (e.g., mainnet, testnet)
+    accountAddress: { type: String, required: true }, // Account address of the borrower
+    collateralAmount: { type: Number, required: true }, // Collateral amount in ETH or other units
+  },
 });
 
 const Borrow = mongoose.model('Borrow', borrowSchema);
@@ -134,12 +141,9 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/lender/activate', async (req, res) => {
-  const { email, interestRate, durationDays, minBorrowAmount, collateralAddress, collateral } = req.body;
+  const { email, interestRate, durationDays, minBorrowAmount } = req.body;
 
   try {
-    console.log('POST /api/lender/activate called');
-    console.log('Request body received:', req.body);
-
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
@@ -154,22 +158,7 @@ app.post('/api/lender/activate', async (req, res) => {
       // Update the user's isLender field if they are not already a lender
       user.isLender = true;
       await user.save();
-      console.log('User updated to lender:', user);
     }
-
-    // Deploy the LendingContract
-    const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL); // Correct usage
-    const privateKey = user.privateKey; // Use the user's private key
-    const wallet = new ethers.Wallet(privateKey, provider);
-
-    // Replace with your compiled contract's ABI and bytecode
-    const LendingContract = require('../../contract/artifacts/src/LendingContract.sol/LendingContract.json'); // Adjust the path to your compiled contract
-    const factory = new ethers.ContractFactory(LendingContract.abi, LendingContract.bytecode, wallet);
-
-    console.log('Deploying LendingContract...');
-    const contract = await factory.deploy();
-    await contract.deployed();
-    console.log('LendingContract deployed at address:', contract.address);
 
     // Check if the lender record already exists
     let lender = await Lender.findOne({ lenderId: user._id });
@@ -178,15 +167,14 @@ app.post('/api/lender/activate', async (req, res) => {
       lender.interestRate = interestRate;
       lender.durationDays = durationDays;
       lender.minBorrowAmount = minBorrowAmount;
-      lender.contractId = contract.address; // Save the deployed contract address
-      lender.lendingConditions = `Interest: ${interestRate}%, Duration: ${durationDays} days`;
+      lender.userEmail = email; // Update the email field
       await lender.save();
-      console.log('Lender record updated:', lender);
     } else {
       // Create a new lender record
       lender = new Lender({
-        contractId: contract.address, // Save the deployed contract address
+        contractId: user.walletAddress, // Assuming walletAddress is used as contractId
         lenderId: user._id,
+        userEmail: email, // Save the user's email
         lendingConditions: `Interest: ${interestRate}%, Duration: ${durationDays} days`,
         initialLendingCapacity: minBorrowAmount,
         lendingAmount: 0,
@@ -195,16 +183,15 @@ app.post('/api/lender/activate', async (req, res) => {
         interestRate,
         durationDays,
         minBorrowAmount,
-        collateralAddress,
-        collateral,
+        collateralAddress: user.walletAddress, // Assuming walletAddress is used as collateralAddress
+        collateral: 'ETH', // Default collateral type
       });
       await lender.save();
-      console.log('Lender record created:', lender);
     }
 
     res.status(201).json({ message: 'Lender account activated successfully', lender });
   } catch (error) {
-    console.error('Error activating lender account:', error.stack || error.message || error);
+    console.error('Error activating lender account:', error);
     res.status(500).json({ error: 'Failed to activate lender account' });
   }
 });
@@ -247,79 +234,28 @@ app.get('/api/lenders', async (req, res) => {
   }
 });
 
-app.post('/api/borrow', async (req, res) => {
-  const { contractId, lenderId, borrowerUserEmail, borrowAmount, pendingAmount, lastTransactionDetails } = req.body;
-
-  // Log the incoming request body
-  console.log('Borrow request initiated');
-  console.log('Request body received:', req.body);
+app.post('/api/searchBorrow', async (req, res) => {
+  const { borrowerUserEmail, lenderEmail } = req.body;
 
   try {
-    // Validate required fields
-    if (!contractId || !lenderId || !borrowerUserEmail || !borrowAmount || !pendingAmount) {
-      console.error('Validation failed: Missing required fields');
-      return res.status(400).json({ error: 'All fields are required' });
+    if (!borrowerUserEmail || !lenderEmail) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Log the validation success
-    console.log('Validation successful');
+  
+    console.log('Searching for borrow record with borrowerUserEmail:', borrowerUserEmail, 'and lenderEmail:', lenderEmail);
+    // Search the Borrow table with matching borrowerUserEmail and lenderId
+    const borrow = await Borrow.findOne({ borrowerUserEmail, lenderEmail});
 
-    // Find the user by borrowerUserEmail
-    const user = await User.findOne({ userEmail: borrowerUserEmail });
-    if (!user) {
-      console.error('Borrower not found with email:', borrowerUserEmail);
-      return res.status(404).json({ error: 'Borrower not found' });
-    }
-
-    // Update the isBorrower field to true
-    if (!user.isBorrower) {
-      user.isBorrower = true;
-      await user.save();
-      console.log('User updated to borrower:', user);
-    }
-
-    // Find the lender by lenderId (not _id)
-    const lender = await Lender.findOne({ lenderId });
-    if (!lender) {
-      console.error('Lender not found with lenderId:', lenderId);
-      return res.status(404).json({ error: 'Lender not found' });
-    }
-
-    // Update the lender's currentBalance and lendingAmount
-    if (lender.currentBalance < borrowAmount) {
-      console.error('Borrow amount exceeds lender\'s current balance');
-      return res.status(400).json({ error: 'Borrow amount exceeds lender\'s current balance' });
-    }
-
-    lender.currentBalance -= borrowAmount; // Decrease current balance
-    lender.lendingAmount += borrowAmount; // Increase lending amount
-    await lender.save();
-    console.log('Lender updated successfully:', lender);
-
-    // Create a new Borrow record
-    const borrow = new Borrow({
-      contractId,
-      lenderId: lender._id, // Use the _id of the lender document
-      borrowerUserEmail, // Save the borrower's email
-      borrowAmount,
-      pendingAmount,
-      lastTransactionDetails,
+    console.log('Borrow record found:', borrow);
+    // Always return success
+    return res.status(200).json({
+      message: borrow ? 'Existing borrow record found' : 'No borrow record found',
+      borrow: borrow || null, // Return the borrow record if found, otherwise null
     });
-
-    // Log the Borrow object before saving
-    console.log('Borrow object to be saved:', borrow);
-
-    // Save the Borrow record to the database
-    await borrow.save();
-
-    // Log the success message after saving
-    console.log('Borrow record saved successfully:', borrow);
-
-    res.status(201).json({ message: 'Borrow request created successfully', borrow });
   } catch (error) {
-    // Log the error details
-    console.error('Error creating borrow request:', error.stack || error.message || error);
-    res.status(500).json({ error: 'Failed to create borrow request' });
+    console.error('Error fetching borrow record:', error);
+    res.status(500).json({ error: 'Failed to fetch borrow record' });
   }
 });
 
@@ -430,6 +366,74 @@ app.post('/api/auth/checkUser', async (req, res) => {
   } catch (error) {
     console.error('Error checking or adding user:', error);
     res.status(500).json({ error: 'Failed to check or add user' });
+  }
+});
+
+app.post('/api/user/updateCollateral', async (req, res) => {
+  const { email, ethereumNetwork, accountAddress, collateralAmount } = req.body;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const user = await User.findOneAndUpdate(
+      { userEmail: email },
+      { collateralAddress: accountAddress, collateralAmount },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'Collateral details updated successfully', user });
+  } catch (error) {
+    console.error('Error updating collateral details:', error);
+    res.status(500).json({ error: 'Failed to update collateral details' });
+  }
+});
+
+app.post('/api/borrow', async (req, res) => {
+  const {
+    contractId,
+    lenderId,
+    lenderEmail, // Accept lender email from the frontend
+    borrowerUserEmail,
+    borrowAmount,
+    pendingAmount,
+    lastTransactionDetails,
+    collateral,
+  } = req.body;
+
+  try {
+    if (!borrowerUserEmail || !lenderId || !lenderEmail || !borrowAmount || !pendingAmount || !collateral) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Validate that the lender exists
+    const lender = await Lender.findById(lenderId);
+    if (!lender) {
+      return res.status(404).json({ error: 'Lender not found' });
+    }
+
+    // Create a new borrow record with the lender's details
+    const borrow = new Borrow({
+      contractId: lender.contractId, // Use the contract ID from the lender
+      lenderId: lender._id, // Use the lender's ID
+      lenderEmail, // Save the lender's email
+      borrowerUserEmail,
+      borrowAmount,
+      pendingAmount,
+      lastTransactionDetails,
+      collateral,
+    });
+
+    await borrow.save();
+    res.status(201).json({ message: 'Borrow record added successfully', borrow });
+  } catch (error) {
+    console.error('Error adding borrow record:', error);
+    res.status(500).json({ error: 'Failed to add borrow record' });
   }
 });
 

@@ -13,34 +13,10 @@ export default function BorrowPage() {
   const [lenders, setLenders] = React.useState([]);
   const [selectedLender, setSelectedLender] = React.useState<string | null>(null);
   const [borrowAmount, setBorrowAmount] = React.useState<number | ''>('');
-  const [showBorrowForm, setShowBorrowForm] = React.useState(false);
-  const [collateralAddress, setCollateralAddress] = React.useState<string | null>(null);
-  const [collateralAmount, setCollateralAmount] = React.useState<number | null>(null);
-  const [isEditingCollateral, setIsEditingCollateral] = React.useState(false);
-  const [collateralError, setCollateralError] = React.useState('');
-  const [successMessage, setSuccessMessage] = React.useState('');
-  const [borrowError, setBorrowError] = React.useState(''); // Error message for borrow amount
-  const [lenderValidationError, setLenderValidationError] = React.useState(''); // Error for lender's available balance validation
-
-  // Fetch user collateral details
-  React.useEffect(() => {
-    const fetchCollateralDetails = async () => {
-      try {
-        const response = await axios.get('http://localhost:9090/api/user/details', {
-          params: { email: userEmail },
-        });
-        setCollateralAddress(response.data.collateralAddress);
-        setCollateralAmount(response.data.collateralAmount);
-      } catch (error) {
-        console.error('Error fetching collateral details:', error);
-        alert('Failed to fetch collateral details. Please try again later.');
-      }
-    };
-
-    if (userEmail) {
-      fetchCollateralDetails();
-    }
-  }, [userEmail]);
+  const [ethereumNetwork, setEthereumNetwork] = React.useState('');
+  const [accountAddress, setAccountAddress] = React.useState('');
+  const [collateralAmount, setCollateralAmount] = React.useState<number | ''>('');
+  const [pendingAmount, setPendingAmount] = React.useState<number | null>(null);
 
   // Fetch lenders from the database
   const fetchLenders = async () => {
@@ -57,51 +33,57 @@ export default function BorrowPage() {
     fetchLenders();
   }, []);
 
-  const handleSaveCollateral = async () => {
-    if (!collateralAddress || !collateralAmount) {
-      setCollateralError('Both collateral address and amount are required');
-      setSuccessMessage('');
+  const handleSelectLender = async (lenderId: string, lenderEmail: string) => {
+    setSelectedLender(lenderId);
+
+    try {
+      const response = await axios.post('http://localhost:9090/api/searchBorrow', {
+        borrowerUserEmail: userEmail, // Borrower's email
+        lenderEmail: lenderEmail, // Lender's email
+      });
+
+      if (response.status === 200 && response.data.borrow) {
+        const borrow = response.data.borrow;
+
+        // Preload the collateral box with details from the database
+        setPendingAmount(borrow.pendingAmount);
+        setEthereumNetwork(borrow.collateral.ethereumNetwork || '');
+        setAccountAddress(borrow.collateral.accountAddress || '');
+        setCollateralAmount(borrow.collateral.collateralAmount || '');
+      } else {
+        // Clear the collateral box if no borrow record exists
+        setPendingAmount(null);
+        setEthereumNetwork('');
+        setAccountAddress('');
+        setCollateralAmount('');
+      }
+    } catch (error) {
+      console.error('Error fetching borrow record:', error);
+      alert('Failed to fetch borrow record.');
+    }
+  };
+
+  const handleRepay = async () => {
+    if (!selectedLender || !pendingAmount || pendingAmount <= 0) {
+      alert('No pending amount to repay.');
       return;
     }
 
     try {
-      setCollateralError('');
-      const response = await axios.post('http://localhost:9090/api/user/updateCollateral', {
-        email: userEmail, // Use email from session context
-        collateralAddress,
-        collateralAmount: parseFloat(collateralAmount as any), // Ensure amount is a number
-      });
-
-      if (response.status === 200) {
-        setSuccessMessage('Collateral updated successfully');
-        console.log('Collateral updated:', response.data);
-        setIsEditingCollateral(false); // Exit editing mode
-        setCollateralAddress(response.data.user.collateralAddress);
-        setCollateralAmount(response.data.user.collateralAmount);
-      }
+      // Add logic to handle repayment
+      alert('Repayment functionality is not implemented yet.');
     } catch (error) {
-      console.error('Error updating collateral:', error);
-      setCollateralError('Failed to update collateral. Please try again.');
+      console.error('Error processing repayment:', error);
+      alert('Failed to process repayment.');
     }
   };
 
-  const handleSelectLender = (lenderId: string) => {
-    setSelectedLender(lenderId);
-    setShowBorrowForm(true); // Show the borrow form when a lender is selected
-    const selectedLenderDetails = lenders.find((lender: any) => lender._id === lenderId);
-
-    // Reset validation errors when a new lender is selected
-    setBorrowError('');
-    setLenderValidationError('');
-
-    console.log('Selected Lender Details:', selectedLenderDetails);
-  };
-
-  const handleBorrowSubmit = async () => {
+  const handleSubmit = async () => {
     if (!selectedLender) {
       setBorrowError('No lender selected.');
       return;
     }
+
 
     const lenderDetails = lenders.find((lender: any) => lender._id === selectedLender);
     if (!lenderDetails) {
@@ -109,36 +91,30 @@ export default function BorrowPage() {
       return;
     }
 
-    if (borrowAmount > lenderDetails.currentBalance) {
-      setLenderValidationError('Borrow amount cannot exceed the selected lender\'s available balance.');
-      return;
-    }
-
-    if (collateralAmount && borrowAmount > collateralAmount / 2) {
-      setBorrowError('Borrow amount cannot exceed half of your collateral amount.');
-      return;
-    }
-
-    console.log('Lender Details:', lenderDetails);
-    console.log('User Details:', session?.user?.email);
-
     try {
       const response = await axios.post('http://localhost:9090/api/borrow', {
-        contractId: lenderDetails.contractId, // Contract ID of the lender
-        lenderId: lenderDetails.lenderId, // Lender ID to be sent to the backend
-        borrowerUserEmail: session?.user?.email, // Borrower ID fetched from session
+        contractId: lenderDetails.contractId, // Pass the contract ID of the lender
+        lenderId: selectedLender, // Pass the selected lender ID
+        lenderEmail: lenderDetails.userEmail, // Pass the lender's email
+        borrowerUserEmail: userEmail, // Borrower's email
         borrowAmount, // Borrow amount entered by the user
         pendingAmount: borrowAmount, // Initially, pending amount is the same as borrow amount
         lastTransactionDetails: `Borrowed ${borrowAmount} units`, // Transaction details
+        collateral: {
+          ethereumNetwork,
+          accountAddress,
+          collateralAmount,
+        }, // Collateral details
       });
+
 
       if (response.status === 201) {
         alert('Borrow request submitted successfully!');
-        setBorrowAmount(''); // Clear the borrow amount after submission
-        setShowBorrowForm(false); // Hide the borrow form after submission
-        setBorrowError(''); // Clear any previous error
-        setLenderValidationError(''); // Clear lender validation error
-        fetchLenders(); // Refetch the list of lenders
+        setBorrowAmount('');
+        setEthereumNetwork('');
+        setAccountAddress('');
+        setCollateralAmount('');
+        setSelectedLender(null);
       }
     } catch (error) {
       console.error('Error submitting borrow request:', error);
@@ -302,7 +278,7 @@ export default function BorrowPage() {
                 </Typography>
                 <RadioGroup
                   value={selectedLender}
-                  onChange={(e) => handleSelectLender(e.target.value)}
+                  onChange={(e) => handleSelectLender(e.target.value, lender.userEmail)}
                 >
                   <FormControlLabel
                     value={lender._id}
@@ -315,62 +291,64 @@ export default function BorrowPage() {
           </Grid>
         ))}
       </Grid>
-      {showBorrowForm && (
-        <Box sx={{ mt: 4, textAlign: 'center' }}>
+      {selectedLender && (
+        <Box sx={{ mt: 4, p: 2, border: '1px solid #ccc', borderRadius: 4 }}>
           <Typography variant="h6" gutterBottom>
-            Enter Borrow Amount
+            Collateral and Borrow Details
           </Typography>
+          <TextField
+            id="ethereumNetwork"
+            label="Ethereum Network"
+            variant="outlined"
+            fullWidth
+            value={ethereumNetwork}
+            onChange={(e) => setEthereumNetwork(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            id="accountAddress"
+            label="Account Address"
+            variant="outlined"
+            fullWidth
+            value={accountAddress}
+            onChange={(e) => setAccountAddress(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            id="collateralAmount"
+            label="Collateral Amount"
+            type="number"
+            variant="outlined"
+            fullWidth
+            value={collateralAmount}
+            onChange={(e) => setCollateralAmount(Number(e.target.value))}
+            sx={{ mb: 2 }}
+          />
           <TextField
             id="borrowAmount"
             label="Borrow Amount"
             type="number"
             variant="outlined"
+            fullWidth
             value={borrowAmount}
-            onChange={(e) => {
-              const value = Number(e.target.value);
-              setBorrowAmount(value);
-
-              const lenderDetails = lenders.find((lender: any) => lender._id === selectedLender);
-
-              if (lenderDetails && value > lenderDetails.currentBalance) {
-                setLenderValidationError('Borrow amount cannot exceed the selected lender\'s available balance.');
-              } else {
-                setLenderValidationError('');
-              }
-
-              if (collateralAmount && value > collateralAmount / 2) {
-                setBorrowError('Borrow amount cannot exceed half of your collateral amount.');
-              } else {
-                setBorrowError('');
-              }
-            }}
-            sx={{ mb: 2, width: '300px' }}
+            onChange={(e) => setBorrowAmount(Number(e.target.value))}
+            sx={{ mb: 2 }}
           />
-          {borrowError && (
-            <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-              {borrowError}
-            </Typography>
-          )}
-          {lenderValidationError && (
-            <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-              {lenderValidationError}
-            </Typography>
-          )}
-          <Box>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleBorrowSubmit}
-              disabled={
-                !borrowAmount ||
-                borrowAmount <= 0 ||
-                !!borrowError ||
-                !!lenderValidationError
-              }
-            >
-              Submit
-            </Button>
-          </Box>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleSubmit}
+            disabled={
+              !ethereumNetwork ||
+              !accountAddress ||
+              !collateralAmount ||
+              collateralAmount <= 0 ||
+              !borrowAmount ||
+              borrowAmount <= 0
+            }
+          >
+            Submit
+          </Button>
         </Box>
       )}
     </Box>
