@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const { ethers, JsonRpcProvider } = require('ethers'); // Import ethers.js
 
 // Initialize express app
 const app = express();
@@ -63,11 +64,7 @@ const borrowSchema = new mongoose.Schema({
   lastTransactionDetails: { type: String, default: null },
 });
 
-
-
 const Borrow = mongoose.model('Borrow', borrowSchema);
-
-
 
 // Routes
 // api changes starts here
@@ -136,59 +133,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// app.post('/api/lender/activate', async (req, res) => {
-//   const { email, interestRate, durationDays, minBorrowAmount, collateralAddress, collateral } = req.body;
-
-//   try {
-//     console.log('POST /api/lender/activate called');
-//     console.log('Request body received:', req.body);
-
-//     if (!email) {
-//       return res.status(400).json({ error: 'Email is required' });
-//     }
-
-//     // Find the user by email
-//     const user = await User.findOne({ userEmail: email });
-//     console.log('User found in database:', user);
-
-//     if (!user) {
-//       return res.status(404).json({ error: 'User not found' });
-//     }
-
-//     // Update the user's isLender field
-//     user.isLender = true;
-//     await user.save();
-//     console.log('User updated to lender:', user);
-
-//     // Create a new lender record
-//     const lender = new Lender({
-//       contractId: `contract_${Date.now()}`,
-//       lenderId: user._id,
-//       lendingConditions: `Interest: ${interestRate}%, Duration: ${durationDays} days`,
-//       initialLendingCapacity: minBorrowAmount,
-//       lendingAmount: minBorrowAmount,
-//       currentBalance: minBorrowAmount,
-//       borrowerCount: 0,
-//       interestRate,
-//       durationDays,
-//       minBorrowAmount,
-//       collateralAddress,
-//       collateral,
-//     });
-
-//     await lender.save();
-//     console.log('Lender record created:', lender);
-
-//     res.status(201).json({ message: 'Lender account activated successfully', lender });
-//   } catch (error) {
-//     console.error('Error activating lender account:', error.stack || error.message || error);
-//     res.status(500).json({ error: 'Failed to activate lender account' });
-//   }
-// });
-
-// api changes ends her
-
-
 app.post('/api/lender/activate', async (req, res) => {
   const { email, interestRate, durationDays, minBorrowAmount, collateralAddress, collateral } = req.body;
 
@@ -213,6 +157,20 @@ app.post('/api/lender/activate', async (req, res) => {
       console.log('User updated to lender:', user);
     }
 
+    // Deploy the LendingContract
+    const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL); // Correct usage
+    const privateKey = user.privateKey; // Use the user's private key
+    const wallet = new ethers.Wallet(privateKey, provider);
+
+    // Replace with your compiled contract's ABI and bytecode
+    const LendingContract = require('../../contract/artifacts/src/LendingContract.sol/LendingContract.json'); // Adjust the path to your compiled contract
+    const factory = new ethers.ContractFactory(LendingContract.abi, LendingContract.bytecode, wallet);
+
+    console.log('Deploying LendingContract...');
+    const contract = await factory.deploy();
+    await contract.deployed();
+    console.log('LendingContract deployed at address:', contract.address);
+
     // Check if the lender record already exists
     let lender = await Lender.findOne({ lenderId: user._id });
     if (lender) {
@@ -220,13 +178,14 @@ app.post('/api/lender/activate', async (req, res) => {
       lender.interestRate = interestRate;
       lender.durationDays = durationDays;
       lender.minBorrowAmount = minBorrowAmount;
+      lender.contractId = contract.address; // Save the deployed contract address
       lender.lendingConditions = `Interest: ${interestRate}%, Duration: ${durationDays} days`;
       await lender.save();
       console.log('Lender record updated:', lender);
     } else {
       // Create a new lender record
       lender = new Lender({
-        contractId: `contract_${Date.now()}`,
+        contractId: contract.address, // Save the deployed contract address
         lenderId: user._id,
         lendingConditions: `Interest: ${interestRate}%, Duration: ${durationDays} days`,
         initialLendingCapacity: minBorrowAmount,
@@ -236,15 +195,11 @@ app.post('/api/lender/activate', async (req, res) => {
         interestRate,
         durationDays,
         minBorrowAmount,
+        collateralAddress,
+        collateral,
       });
       await lender.save();
       console.log('Lender record created:', lender);
-
-      const provider = new ethers.providers.JsonRpcProvider("http://localhost:32770") // using default http://localhost:8545
-      const signer = new ethers.Wallet(privkey, provider)
-      const myContract = await ethers.getContractAt('MyContract', contractAddress, signer)
-      const out = await myContract.balanceOf(walletAddress)
-      console.log(out)
     }
 
     res.status(201).json({ message: 'Lender account activated successfully', lender });
@@ -253,7 +208,6 @@ app.post('/api/lender/activate', async (req, res) => {
     res.status(500).json({ error: 'Failed to activate lender account' });
   }
 });
-
 
 app.get('/api/lender/details', async (req, res) => {
   const { email } = req.query;
@@ -293,50 +247,6 @@ app.get('/api/lenders', async (req, res) => {
   }
 });
 
-
-
-// app.post('/api/borrow', async (req, res) => {
-//   const { contractId, lenderId, borrowAmount, pendingAmount, lastTransactionDetails } = req.body;
-
-//   // Log the incoming request body
-//   console.log('Borrow request initiated');
-//   console.log('Request body received:', req.body);
-
-//   try {
-//     // Validate required fields
-//     if (!contractId || !lenderId || !borrowAmount || !pendingAmount) {
-//       console.error('Validation failed: Missing required fields');
-//       return res.status(400).json({ error: 'All fields are required' });
-//     }
-
-//     // Log the validation success
-//     console.log('Validation successful');
-
-//     // Create a new Borrow record
-//     const borrow = new Borrow({
-//       contractId,
-//       lenderId,
-//       borrowAmount,
-//       pendingAmount,
-//       lastTransactionDetails,
-//     });
-
-//     // Log the Borrow object before saving
-//     console.log('Borrow object to be saved:', borrow);
-
-//     // Save the Borrow record to the database
-//     await borrow.save();
-
-//     // Log the success message after saving
-//     console.log('Borrow record saved successfully:', borrow);
-
-//     res.status(201).json({ message: 'Borrow request created successfully', borrow });
-//   } catch (error) {
-//     // Log the error details
-//     console.error('Error creating borrow request:', error.stack || error.message || error);
-//     res.status(500).json({ error: 'Failed to create borrow request' });
-//   }
-// });
 app.post('/api/borrow', async (req, res) => {
   const { contractId, lenderId, borrowerUserEmail, borrowAmount, pendingAmount, lastTransactionDetails } = req.body;
 
