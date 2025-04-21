@@ -31,6 +31,8 @@ const userSchema = new mongoose.Schema({
   creditScore: { type: Number, default: 0 },
   collateralAddress: { type: String, default: null },
   collateralAmount: { type: Number, default: 0 },
+  address: { type: String, default: null }, // Add address field
+  phoneNumber: { type: String, default: null }, // Add phone number field
 });
 
 const User = mongoose.model('User', userSchema);
@@ -333,6 +335,79 @@ app.get('/api/user/details', async (req, res) => {
   }
 });
 
+app.get('/api/user/profile', async (req, res) => {
+  const { email } = req.query;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const user = await User.findOne({ userEmail: email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({
+      address: user.address || null,
+      phoneNumber: user.phoneNumber || null,
+    });
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    res.status(500).json({ error: 'Failed to fetch user details' });
+  }
+});
+
+app.post('/api/user/updateAddress', async (req, res) => {
+  const { email, address } = req.body;
+
+  try {
+    if (!email || !address) {
+      return res.status(400).json({ error: 'Email and address are required' });
+    }
+
+    const user = await User.findOneAndUpdate(
+      { userEmail: email },
+      { address },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'Address updated successfully', user });
+  } catch (error) {
+    console.error('Error updating address:', error);
+    res.status(500).json({ error: 'Failed to update address' });
+  }
+});
+
+app.post('/api/user/updatePhoneNumber', async (req, res) => {
+  const { email, phoneNumber } = req.body;
+
+  try {
+    if (!email || !phoneNumber) {
+      return res.status(400).json({ error: 'Email and phone number are required' });
+    }
+
+    const user = await User.findOneAndUpdate(
+      { userEmail: email },
+      { phoneNumber },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'Phone number updated successfully', user });
+  } catch (error) {
+    console.error('Error updating phone number:', error);
+    res.status(500).json({ error: 'Failed to update phone number' });
+  }
+});
+
 app.post('/api/auth/checkUser', async (req, res) => {
   const { email } = req.body;
 
@@ -434,6 +509,33 @@ app.post('/api/borrow', async (req, res) => {
   } catch (error) {
     console.error('Error adding borrow record:', error);
     res.status(500).json({ error: 'Failed to add borrow record' });
+  }
+});
+
+app.post('/api/user/deleteAccount', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Check if the user has any active loans in the Borrow table
+    const activeLoan = await Borrow.findOne({ borrowerUserEmail: email });
+    if (activeLoan) {
+      return res.status(400).json({ error: 'Cannot delete user with active loans.' });
+    }
+
+    // Delete the user from the database
+    const user = await User.findOneAndDelete({ userEmail: email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'User account deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting user account:', error);
+    res.status(500).json({ error: 'Failed to delete user account.' });
   }
 });
 
