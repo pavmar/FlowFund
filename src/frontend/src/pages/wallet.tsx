@@ -1,6 +1,4 @@
 import * as React from 'react';
-import { MetaMaskUIProvider } from '@metamask/sdk-react-ui';
-import Metamask from './metamask';
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import Box from '@mui/material/Box';
@@ -14,41 +12,48 @@ export default function WalletPage() {
   const { session } = useSession(); // Get session details from context
   const email = session?.user?.email; // Extract email from session
 
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState('');
+  const [privateKey, setPrivateKey] = useState('');
   const [balance, setBalance] = useState<string | null>(null);
-  const [sendAmount, setSendAmount] = useState(''); // State to store the amount to send
-  const [recipientAddress, setRecipientAddress] = useState(''); // State to store the recipient's wallet address
 
   useEffect(() => {
-    async function fetchAccountsAndBalance() {
-      if (!window.ethereum) {
-        setError('MetaMask is not installed. Please install MetaMask and try again.');
+    async function fetchUserDetails() {
+      if (!email) {
+        setError('Email is required to fetch user details.');
         return;
       }
 
       try {
-        // Request accounts from MetaMask
-        const accounts = (await window.ethereum.request({ method: 'eth_requestAccounts' })) || [];
-        const account = accounts && accounts.length > 0 ? accounts[0] : null;
-        if (!account) {
-          setError('No accounts found. Please connect your wallet.');
-          return;
-        }
-        setWalletAddress(account);
+        // Fetch user details from the database
+        const response = await axios.get('http://localhost:9090/api/user/details', {
+          params: { email },
+        });
 
-        // Update the wallet address in the user database
-        if (email) {
-          await updateWalletAddress(account, email);
-        } else {
-          console.error('Email not found in session.');
-        }
+        const { walletAddress, privateKey } = response.data;
+        setWalletAddress(walletAddress || ''); // Set wallet address or leave empty
+        setPrivateKey(privateKey || ''); // Set private key or leave empty
+        setError(null); // Clear any previous errors
+      } catch (err) {
+        console.error('Error fetching user details:', err);
+        setError('Failed to fetch user details. Please try again.');
+      }
+    }
 
-        // Use ethers.js to connect to the provider
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
+    fetchUserDetails();
+  }, [email]);
 
-        // Fetch the balance of the connected account
-        const balanceInWei = await provider.getBalance(account);
+  useEffect(() => {
+    async function fetchBalance() {
+      if (!walletAddress) {
+        setError('Wallet address is required to fetch balance.');
+        return;
+      }
+
+      try {
+        // Use ethers.js to fetch the balance
+        const provider = new ethers.providers.JsonRpcProvider(import.meta.env.VITE_REACT_APP_ETHEREUM_RPC_URL); // Replace with your RPC URL
+        const balanceInWei = await provider.getBalance(walletAddress);
         const balanceInEth = ethers.utils.formatEther(balanceInWei);
 
         setBalance(parseFloat(balanceInEth).toFixed(4));
@@ -59,121 +64,90 @@ export default function WalletPage() {
       }
     }
 
-    // Listen for account changes in MetaMask
-    function handleAccountsChanged(accounts: string[]) {
-      if (accounts.length === 0) {
-        setError('MetaMask is locked or no accounts are available.');
-        setWalletAddress('');
-        setBalance(null);
-      } else {
-        const newAccount = accounts[0];
-        setWalletAddress(newAccount);
-        if (email) {
-          updateWalletAddress(newAccount, email); // Update the wallet address in the database
-        }
-        fetchAccountsAndBalance(); // Fetch the balance for the new account
-      }
+    if (walletAddress) {
+      fetchBalance();
+    }
+  }, [walletAddress]);
+
+  async function updateUserDetails() {
+    if (!email || !walletAddress || !privateKey) {
+      setError('Email, wallet address, and private key are required.');
+      return;
     }
 
-    fetchAccountsAndBalance();
-
-    // Attach the event listener for account changes
-    window.ethereum.on('accountsChanged', handleAccountsChanged);
-
-    // Cleanup the event listener on component unmount
-    return () => {
-      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-    };
-  }, [email]);
-
-  async function updateWalletAddress(address: string, email: string) {
     try {
-      // Replace with the actual API endpoint to update the wallet address in the user database
-      await axios.post('http://localhost:9090/api/auth/updateWalletAddress', {
+      // Update the wallet address and private key in the user database
+      await axios.post('http://localhost:9090/api/auth/updateUserDetails', {
         email,
-        walletAddress: address,
+        walletAddress,
+        privateKey,
       });
-      console.log('Wallet address updated successfully in the database.');
+      console.log('User details updated successfully in the database.');
+      setError(null); // Clear any previous errors
     } catch (err) {
-      console.error('Error updating wallet address in the database:', err);
+      console.error('Error updating user details in the database:', err);
+      setError('Failed to update user details. Please try again.');
     }
   }
 
-  const handleSend = () => {
-    if (!sendAmount || isNaN(Number(sendAmount)) || Number(sendAmount) <= 0) {
-      alert('Please enter a valid amount to send.');
-      return;
-    }
-    if (!recipientAddress) {
-      alert('Please enter a valid recipient address.');
-      return;
-    }
-    alert(`Send functionality is not implemented yet. Amount: ${sendAmount} ETH, Recipient: ${recipientAddress}`);
-  };
-
-  const handleReceive = () => {
-    alert(`Your wallet address is: ${walletAddress}`);
-  };
-
   return (
-    <MetaMaskUIProvider
-      sdkOptions={{
-        dappMetadata: {
-          name: 'React Demo Button',
-          url: 'http://reactdemobutton.localhost',
-        },
-        checkInstallationImmediately: false,
+    <Box
+      sx={{
+        marginTop: 4,
+        padding: 2,
+        border: '1px solid #ccc',
+        borderRadius: 4,
+        maxWidth: 400,
+        margin: 'auto',
+        textAlign: 'left', // Align the box content to the left
       }}
     >
-      <Metamask />
-      <Box
-        sx={{
-          marginTop: 4,
-          padding: 2,
-          border: '1px solid #ccc',
-          borderRadius: 4,
-          maxWidth: 400,
-          margin: 'auto',
-          textAlign: 'left', // Align the box content to the left
-        }}
-      >
-        <Typography variant="h6">Wallet Balance</Typography>
-        {error ? (
-          <Typography variant="body1" color="error">
-            {error}
+      <Typography variant="h6">Wallet Management</Typography>
+      {error && (
+        <Typography variant="body1" color="error">
+          {error}
+        </Typography>
+      )}
+      <Box sx={{ marginTop: 2 }}>
+        <TextField
+          label="Wallet Address"
+          variant="outlined"
+          fullWidth
+          value={walletAddress}
+          onChange={(e) => setWalletAddress(e.target.value)}
+          sx={{ marginBottom: 2 }}
+        />
+        <TextField
+          label="Private Key"
+          variant="outlined"
+          fullWidth
+          type="password" // Hidden input for private key
+          value={privateKey}
+          onChange={(e) => setPrivateKey(e.target.value)}
+          sx={{ marginBottom: 2 }}
+        />
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={updateUserDetails}
+          sx={{ marginBottom: 2 }}
+        >
+          Update Details
+        </Button>
+        <Box
+          sx={{
+            marginTop: 2,
+            padding: 2,
+            border: '1px solid #ccc',
+            borderRadius: 4,
+            backgroundColor: '#f9f9f9',
+          }}
+        >
+          <Typography variant="body1">
+            <strong>Balance:</strong> {balance !== null ? `${balance} ETH` : 'Fetching...'}
           </Typography>
-        ) : balance !== null ? (
-          <Typography variant="body1">{balance} ETH</Typography>
-        ) : (
-          <Typography variant="body1">Fetching balance...</Typography>
-        )}
-        <Box sx={{ marginTop: 2 }}>
-          <TextField
-            label="Recipient Address"
-            variant="outlined"
-            fullWidth
-            value={recipientAddress}
-            onChange={(e) => setRecipientAddress(e.target.value)}
-            sx={{ marginBottom: 2 }}
-          />
-          <TextField
-            label="Amount to Send (ETH)"
-            variant="outlined"
-            fullWidth
-            value={sendAmount}
-            onChange={(e) => setSendAmount(e.target.value)}
-            sx={{ marginBottom: 2 }}
-          />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-            <Button variant="contained" color="primary" onClick={handleSend}>
-              Send
-            </Button>
-            <Button variant="contained" color="secondary" onClick={handleReceive}>
-              Receive
-            </Button>
-          </Box>
         </Box>
       </Box>
-    </MetaMaskUIProvider>
+    </Box>
   );
 }
