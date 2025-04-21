@@ -10,13 +10,28 @@ export default function BorrowPage() {
   const { session } = useSession(); // Access the session
   const userEmail = session?.user?.email; // Retrieve the logged-in user's email
 
-  const [lenders, setLenders] = React.useState([]);
+  interface Lender {
+    _id: string;
+    contractId: string;
+    userEmail: string;
+    interestRate?: number;
+    minBorrowAmount?: number;
+    durationDays?: number;
+    currentBalance?: number;
+  }
+
+  const [lenders, setLenders] = React.useState<Lender[]>([]);
   const [selectedLender, setSelectedLender] = React.useState<string | null>(null);
   const [borrowAmount, setBorrowAmount] = React.useState<number | ''>('');
   const [ethereumNetwork, setEthereumNetwork] = React.useState('');
   const [accountAddress, setAccountAddress] = React.useState('');
   const [collateralAmount, setCollateralAmount] = React.useState<number | ''>('');
+  const [collateralAddress, setCollateralAddress] = React.useState<string | ''>('');
   const [pendingAmount, setPendingAmount] = React.useState<number | null>(null);
+  const [borrowError, setBorrowError] = React.useState<string | null>(null);
+  const [isEditingCollateral, setIsEditingCollateral] = React.useState(false);
+  const [collateralError, setCollateralError] = React.useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
 
   // Fetch lenders from the database
   const fetchLenders = async () => {
@@ -84,7 +99,6 @@ export default function BorrowPage() {
       return;
     }
 
-
     const lenderDetails = lenders.find((lender: any) => lender._id === selectedLender);
     if (!lenderDetails) {
       setBorrowError('Selected lender details not found.');
@@ -94,19 +108,18 @@ export default function BorrowPage() {
     try {
       const response = await axios.post('http://localhost:9090/api/borrow', {
         contractId: lenderDetails.contractId, // Pass the contract ID of the lender
-        lenderId: selectedLender, // Pass the selected lender ID
         lenderEmail: lenderDetails.userEmail, // Pass the lender's email
         borrowerUserEmail: userEmail, // Borrower's email
         borrowAmount, // Borrow amount entered by the user
         pendingAmount: borrowAmount, // Initially, pending amount is the same as borrow amount
         lastTransactionDetails: `Borrowed ${borrowAmount} units`, // Transaction details
+        lenderId: lenderDetails._id, // Lender ID
         collateral: {
           ethereumNetwork,
           accountAddress,
           collateralAmount,
         }, // Collateral details
       });
-
 
       if (response.status === 201) {
         alert('Borrow request submitted successfully!');
@@ -122,139 +135,25 @@ export default function BorrowPage() {
     }
   };
 
+  const handleSaveCollateral = async () => {
+    if (!collateralAddress || !collateralAmount || collateralAmount <= 0) {
+      setCollateralError('Please provide valid collateral details.');
+      return;
+    }
+
+    try {
+      // Add logic to save collateral details
+      setSuccessMessage('Collateral details saved successfully!');
+      setCollateralError(null);
+      setIsEditingCollateral(false);
+    } catch (error) {
+      console.error('Error saving collateral details:', error);
+      setCollateralError('Failed to save collateral details.');
+    }
+  };
+
   return (
     <Box sx={{ flexGrow: 1, p: 2 }}>
-      <Typography variant="h4" gutterBottom>
-        Collateral Details
-      </Typography>
-      {collateralAddress && collateralAmount ? (
-        <Box sx={{ mb: 4 }}>
-          {!isEditingCollateral ? (
-            <>
-              <Typography variant="body1">
-                Collateral Address: {collateralAddress}
-              </Typography>
-              <Typography variant="body1">
-                Collateral Amount: {collateralAmount} units
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => setIsEditingCollateral(true)}
-                sx={{ mt: 2 }}
-              >
-                Update Collateral Details
-              </Button>
-            </>
-          ) : (
-            <>
-              <TextField
-                label="Collateral Address"
-                fullWidth
-                margin="normal"
-                value={collateralAddress || ''}
-                onChange={(e) => setCollateralAddress(e.target.value)}
-              />
-              <TextField
-                label="Collateral Amount"
-                type="number"
-                fullWidth
-                margin="normal"
-                value={collateralAmount || ''}
-                onChange={(e) => setCollateralAmount(Number(e.target.value))}
-              />
-              {collateralError && (
-                <Typography variant="body2" color="error">
-                  {collateralError}
-                </Typography>
-              )}
-              {successMessage && (
-                <Typography variant="body2" color="success">
-                  {successMessage}
-                </Typography>
-              )}
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleSaveCollateral}
-                sx={{ mt: 2 }}
-              >
-                Save Collateral
-              </Button>
-              <Button
-                variant="outlined"
-                color="secondary"
-                onClick={() => setIsEditingCollateral(false)}
-                sx={{ mt: 2, ml: 2 }}
-              >
-                Cancel
-              </Button>
-            </>
-          )}
-        </Box>
-      ) : (
-        <Box sx={{ mb: 4 }}>
-          {!isEditingCollateral ? (
-            <>
-              <Typography variant="body1" color="error">
-                No collateral details found.
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => setIsEditingCollateral(true)}
-                sx={{ mt: 2 }}
-              >
-                Add Collateral Details
-              </Button>
-            </>
-          ) : (
-            <>
-              <TextField
-                label="Collateral Address"
-                fullWidth
-                margin="normal"
-                value={collateralAddress || ''}
-                onChange={(e) => setCollateralAddress(e.target.value)}
-              />
-              <TextField
-                label="Collateral Amount"
-                type="number"
-                fullWidth
-                margin="normal"
-                value={collateralAmount || ''}
-                onChange={(e) => setCollateralAmount(Number(e.target.value))}
-              />
-              {collateralError && (
-                <Typography variant="body2" color="error">
-                  {collateralError}
-                </Typography>
-              )}
-              {successMessage && (
-                <Typography variant="body2" color="success">
-                  {successMessage}
-                </Typography>
-              )}
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleSaveCollateral}
-                sx={{ mt: 2 }}
-              >
-                Save Collateral
-              </Button>
-              <Button
-                variant="outlined"
-                color="secondary"
-                onClick={() => setIsEditingCollateral(false)}
-                sx={{ mt: 2, ml: 2 }}
-              >
-                Cancel
-              </Button>
-            </>
-          )}
-        </Box>
-      )}
 
       <Typography variant="h4" gutterBottom>
         Available Lenders
