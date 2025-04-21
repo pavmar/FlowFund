@@ -220,8 +220,6 @@ app.post('/api/lender/activate', async (req, res) => {
       lender.interestRate = interestRate;
       lender.durationDays = durationDays;
       lender.minBorrowAmount = minBorrowAmount;
-      lender.collateralAddress = collateralAddress;
-      lender.collateral = collateral;
       lender.lendingConditions = `Interest: ${interestRate}%, Duration: ${durationDays} days`;
       await lender.save();
       console.log('Lender record updated:', lender);
@@ -238,11 +236,15 @@ app.post('/api/lender/activate', async (req, res) => {
         interestRate,
         durationDays,
         minBorrowAmount,
-        collateralAddress,
-        collateral,
       });
       await lender.save();
       console.log('Lender record created:', lender);
+
+      const provider = new ethers.providers.JsonRpcProvider("http://localhost:32770") // using default http://localhost:8545
+      const signer = new ethers.Wallet(privkey, provider)
+      const myContract = await ethers.getContractAt('MyContract', contractAddress, signer)
+      const out = await myContract.balanceOf(walletAddress)
+      console.log(out)
     }
 
     res.status(201).json({ message: 'Lender account activated successfully', lender });
@@ -261,23 +263,20 @@ app.get('/api/lender/details', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    // Find the user by email
     const user = await User.findOne({ userEmail: email });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (!user.isLender) {
-      return res.status(400).json({ error: 'User is not a lender' });
-    }
-
-    // Find the lender details
     const lender = await Lender.findOne({ lenderId: user._id });
     if (!lender) {
-      return res.status(404).json({ error: 'Lender details not found' });
+      return res.status(404).json({ error: 'Lender record not found' });
     }
 
-    res.status(200).json({ user, lender });
+    res.status(200).json({
+      lender,
+      walletAddress: user.walletAddress, // Include walletAddress in the response
+    });
   } catch (error) {
     console.error('Error fetching lender details:', error);
     res.status(500).json({ error: 'Failed to fetch lender details' });
@@ -414,61 +413,31 @@ app.post('/api/borrow', async (req, res) => {
   }
 });
 
-
-// app.post('/api/user/updateCollateral', async (req, res) => {
-//   const { email, collateralAddress, collateralAmount } = req.body;
-
-//   try {
-//     if (!email) {
-//       return res.status(400).json({ error: 'Email is required' });
-//     }
-
-//     // Find the user by email
-//     const user = await User.findOne({ userEmail: email });
-//     if (!user) {
-//       return res.status(404).json({ error: 'User not found' });
-//     }
-
-//     // Update collateral details
-//     user.collateralAddress = collateralAddress || user.collateralAddress;
-//     user.collateralAmount = collateralAmount || user.collateralAmount;
-//     await user.save();
-
-//     console.log('User collateral updated:', user);
-//     res.status(200).json({ message: 'Collateral updated successfully', user });
-//   } catch (error) {
-//     console.error('Error updating collateral:', error);
-//     res.status(500).json({ error: 'Failed to update collateral' });
-//   }
-// });
-
-app.post('/api/user/updateCollateral', async (req, res) => {
-  const { email, collateralAddress, collateralAmount } = req.body;
+app.post('/api/auth/updateWalletAddress', async (req, res) => {
+  const { email, walletAddress } = req.body;
 
   try {
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
+    if (!email || !walletAddress) {
+      return res.status(400).json({ error: 'Email and walletAddress are required' });
     }
 
-    // Find the user by email
-    const user = await User.findOne({ userEmail: email });
+    const user = await User.findOneAndUpdate(
+      { userEmail: email },
+      { walletAddress },
+      { new: true }
+    );
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Update collateral details
-    user.collateralAddress = collateralAddress || user.collateralAddress;
-    user.collateralAmount = collateralAmount || user.collateralAmount;
-    await user.save();
-
-    console.log('User collateral updated:', user);
-    res.status(200).json({ message: 'Collateral updated successfully', user });
+    console.log('Wallet address updated successfully:', user);
+    res.status(200).json({ message: 'Wallet address updated successfully', user });
   } catch (error) {
-    console.error('Error updating collateral:', error);
-    res.status(500).json({ error: 'Failed to update collateral' });
+    console.error('Error updating wallet address:', error);
+    res.status(500).json({ error: 'Failed to update wallet address' });
   }
 });
-
 
 app.get('/api/user/details', async (req, res) => {
   const { email } = req.query;
@@ -483,13 +452,46 @@ app.get('/api/user/details', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.status(200).json({
-      collateralAddress: user.collateralAddress,
-      collateralAmount: user.collateralAmount,
-    });
+    res.status(200).json({ walletAddress: user.walletAddress });
   } catch (error) {
     console.error('Error fetching user details:', error);
     res.status(500).json({ error: 'Failed to fetch user details' });
+  }
+});
+
+app.post('/api/auth/checkUser', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Check if the user exists in the database
+    let user = await User.findOne({ userEmail: email });
+
+    if (!user) {
+      // Add the user to the database if they don't exist
+      user = new User({
+        userEmail: email,
+        walletAddress: null, // Default value
+        privateKey: null, // Default value
+        isLender: false,
+        isBorrower: false,
+        lastLogin: new Date(),
+        creditScore: 0,
+        collateralAddress: null,
+        collateralAmount: 0,
+      });
+
+      await user.save();
+      console.log('New user added to the database:', user);
+    }
+
+    res.status(200).json({ message: 'User check/add operation completed successfully', user });
+  } catch (error) {
+    console.error('Error checking or adding user:', error);
+    res.status(500).json({ error: 'Failed to check or add user' });
   }
 });
 

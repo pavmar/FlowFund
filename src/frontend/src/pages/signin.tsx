@@ -52,6 +52,24 @@ export default function SignIn() {
             };
             setSession(userSession);
 
+            // Check if the user exists in the database and add them if not
+            try {
+              const userCheckResponse = await fetch('http://localhost:9090/api/auth/checkUser', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: result.user.email }),
+              });
+
+              if (!userCheckResponse.ok) {
+                const errorText = await userCheckResponse.text();
+                console.error('Failed to check or add user in the backend:', errorText);
+              } else {
+                console.log('User check/add operation completed successfully.');
+              }
+            } catch (error) {
+              console.error('Error while checking or adding user in the backend:', error);
+            }
+
             // Update login activity in the backend
             try {
               const loginResponse = await fetch('http://localhost:9090/api/auth/login', {

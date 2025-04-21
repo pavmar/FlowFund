@@ -15,24 +15,58 @@ describe("LendingContract", function () {
     await lendingContract.waitForDeployment();
 
     console.log("LendingContract deployed at:", lendingContract.target);
-    // Send 500 ETH to the contract
-    // const initialFunding = ethers.parseEther("500"); // 500 ETH
-    // await owner.sendTransaction({
-    //   to: lendingContract.target,
-    //   value: initialFunding,
-    // });
+  });
 
-    // // Verify the contract's balance
-    // const contractBalance = await ethers.provider.getBalance(lendingContract.target);
-    // console.log("Contract balance after funding:", ethers.formatEther(contractBalance), "ETH");
-    // expect(contractBalance).to.equal(initialFunding);
-  
+  it("should allow a user to submit collateral", async function () {
+    const collateralAmount = ethers.parseEther("1"); // 1 ETH
+
+    // Borrower submits collateral
+    const borrowerContract = lendingContract.connect(borrower);
+    await borrowerContract.submitCollateral({ value: collateralAmount });
+
+    // Check the collateral balance
+    const collateralBalance = await lendingContract.collateral(borrower.address);
+    expect(collateralBalance).to.equal(collateralAmount);
+  });
+
+  it("should allow a user to borrow up to 50% of their collateral", async function () {
+    const collateralAmount = ethers.parseEther("2"); // 2 ETH
+    const borrowAmount = ethers.parseEther("1"); // 50% of collateral
+
+    // Borrower submits collateral
+    const borrowerContract = lendingContract.connect(borrower);
+    await borrowerContract.submitCollateral({ value: collateralAmount });
+
+    // Borrower borrows ETH
+    await borrowerContract.borrow(borrowAmount);
+
+    // Check the contract's balance after borrowing
+    const contractBalance = await ethers.provider.getBalance(lendingContract.target);
+    console.log("Contract balance after borrowing:", ethers.formatEther(contractBalance), "ETH");
+
+    // Check the borrower's collateral (should remain unchanged)
+    const collateralBalance = await lendingContract.collateral(borrower.address);
+    expect(collateralBalance).to.equal(collateralAmount);
+  });
+
+  it("should revert if a user tries to borrow more than 50% of their collateral", async function () {
+    const collateralAmount = ethers.parseEther("2"); // 2 ETH
+    const excessiveBorrowAmount = ethers.parseEther("1.1"); // More than 50% of collateral
+
+    // Borrower submits collateral
+    const borrowerContract = lendingContract.connect(borrower);
+    await borrowerContract.submitCollateral({ value: collateralAmount });
+
+    // Borrower tries to borrow more than 50% of their collateral
+    await expect(
+      borrowerContract.borrow(excessiveBorrowAmount)
+    ).to.be.revertedWith("Cannot borrow more than 50% of collateral");
   });
 
   it("should allow a user to lend ETH", async function () {
-    const lendAmount = ethers.parseEther("501.0"); // 1 ETH
+    const lendAmount = ethers.parseEther("1"); // 1 ETH
 
-    // Connect the contract to the lender and send ETH
+    // Lender lends ETH
     const lenderContract = lendingContract.connect(lender);
     await lenderContract.lend({ value: lendAmount });
 
@@ -45,89 +79,55 @@ describe("LendingContract", function () {
     expect(contractBalance).to.equal(lendAmount);
   });
 
-  it("should allow a user to borrow ETH if funds are available", async function () {
-    const lendAmount = ethers.parseEther("2"); // 2 ETH
-    const borrowAmount = ethers.parseEther("1"); // 1 ETH
+  it("should allow a user to repay ETH and update their borrowed amount", async function () {
+    // Borrower submits collateral
+    const collateralAmount = ethers.parseEther("2"); // 2 ETH
+    const borrowAmount = ethers.parseEther("1"); // 50% of collateral
+    const repayAmount = ethers.parseEther("0.5"); // 0.5 ETH
 
-    // Connect the contract to the lender and send ETH
-    const lenderContract = lendingContract.connect(lender);
-    await lenderContract.lend({ value: lendAmount });
-
-    // Debug: Check contract balance before borrowing
-    const contractBalanceBefore = await ethers.provider.getBalance(lendingContract.target);
-    console.log("Contract balance before borrowing:", ethers.formatEther(contractBalanceBefore), "ETH");
-
-    // Connect the contract to the borrower and borrow ETH
     const borrowerContract = lendingContract.connect(borrower);
+    await borrowerContract.submitCollateral({ value: collateralAmount });
     await borrowerContract.borrow(borrowAmount);
 
-    // Check the contract's balance after borrowing
-    const contractBalanceAfter = await ethers.provider.getBalance(lendingContract.target);
-    console.log("Contract balance after borrowing:", ethers.formatEther(contractBalanceAfter), "ETH");
-    expect(contractBalanceAfter).to.equal(lendAmount - borrowAmount);
+    // Borrower repays part of the borrowed ETH
+    await borrowerContract.repay({ value: repayAmount });
 
-    // Check the borrower's balance (should increase by borrowAmount)
-    const borrowerBalance = await ethers.provider.getBalance(borrower.address);
-    console.log("Borrower's balance after borrowing:", ethers.formatEther(borrowerBalance), "ETH");
+    // Check the borrower's borrowed amount
+    const borrowedAmount = await lendingContract.borrowed(borrower.address);
+    expect(borrowedAmount).to.equal(ethers.parseEther("0.5"));
+
+    // Check the borrower's collateral (should remain unchanged)
+    const collateralBalance = await lendingContract.collateral(borrower.address);
+    expect(collateralBalance).to.equal(collateralAmount);
+
+    // Check the contract's balance after repayment
+    const contractBalance = await ethers.provider.getBalance(lendingContract.target);
+    console.log("Contract balance after repayment:", ethers.formatEther(contractBalance), "ETH");
   });
 
-  it("should revert if trying to borrow more than available", async function () {
-    const lendAmount = ethers.parseEther("2.0"); // 1 ETH
-    const excessiveBorrow = ethers.parseEther("3.0"); // 2 ETH (more than available)
+  it("should revert if trying to borrow without submitting collateral", async function () {
+    const borrowAmount = ethers.parseEther("1"); // 1 ETH
 
-    // Connect the contract to the lender and send ETH
-    const lenderContract = lendingContract.connect(lender);
-    await lenderContract.lend({ value: lendAmount });
-
-    // Debug: Check contract balance before excessive borrowing
-    const contractBalance = await ethers.provider.getBalance(lendingContract.target);
-    console.log("Contract balance before excessive borrowing:", ethers.formatEther(contractBalance), "ETH");
-
-    // Connect the contract to the borrower and try to borrow more than available
+    // Borrower tries to borrow without submitting collateral
     const borrowerContract = lendingContract.connect(borrower);
     await expect(
-      borrowerContract.borrow(excessiveBorrow)
-    ).to.be.revertedWith("Insufficient funds in contract");
+      borrowerContract.borrow(borrowAmount)
+    ).to.be.revertedWith("Cannot borrow more than 50% of collateral");
   });
 
   it("should revert if trying to lend 0 ETH", async function () {
-    // Connect the contract to the lender and try to lend 0 ETH
+    // Lender tries to lend 0 ETH
     const lenderContract = lendingContract.connect(lender);
     await expect(
       lenderContract.lend({ value: 0 })
     ).to.be.revertedWith("Must send ETH to lend");
   });
 
-  it("should allow a user to repay ETH and update their balance", async function () {
-    // addr1 lends 1 ETH
-    await lendingContract.connect(addr1).lend({ value: ethers.parseEther("1") });
-
-    // Check initial balance
-    let balance = await lendingContract.balances(addr1.address);
-    expect(balance).to.equal(ethers.parseEther("1"));
-
-    // addr1 repays 0.5 ETH
-    await lendingContract.connect(addr1).repay({ value: ethers.parseEther("0.5") });
-
-    // Check updated balance
-    balance = await lendingContract.balances(addr1.address);
-    expect(balance).to.equal(ethers.parseEther("0.5"));
-  });
-
-  it("should revert if the repay amount exceeds the user's balance", async function () {
-    // addr1 lends 1 ETH
-    await lendingContract.connect(addr1).lend({ value: ethers.parseEther("1") });
-
-    // Attempt to repay 1.5 ETH (more than the balance)
+  it("should revert if trying to repay 0 ETH", async function () {
+    // Borrower tries to repay 0 ETH
+    const borrowerContract = lendingContract.connect(borrower);
     await expect(
-      lendingContract.connect(addr1).repay({ value: ethers.parseEther("1.5") })
-    ).to.be.revertedWith("Repay amount exceeds balance");
-  });
-
-  it("should revert if the repay amount is zero", async function () {
-    // addr1 attempts to repay 0 ETH
-    await expect(
-      lendingContract.connect(addr1).repay({ value: ethers.parseEther("0") })
+      borrowerContract.repay({ value: 0 })
     ).to.be.revertedWith("Must send ETH to repay");
   });
 });

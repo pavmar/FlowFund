@@ -7,8 +7,13 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
+import axios from 'axios';
+import { useSession } from '../SessionContext'; // Assuming you have a session context
 
 export default function WalletPage() {
+  const { session } = useSession(); // Get session details from context
+  const email = session?.user?.email; // Extract email from session
+
   const [error, setError] = React.useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState('');
   const [balance, setBalance] = useState<string | null>(null);
@@ -24,9 +29,20 @@ export default function WalletPage() {
 
       try {
         // Request accounts from MetaMask
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const account = accounts[0];
+        const accounts = (await window.ethereum.request({ method: 'eth_requestAccounts' })) || [];
+        const account = accounts && accounts.length > 0 ? accounts[0] : null;
+        if (!account) {
+          setError('No accounts found. Please connect your wallet.');
+          return;
+        }
         setWalletAddress(account);
+
+        // Update the wallet address in the user database
+        if (email) {
+          await updateWalletAddress(account, email);
+        } else {
+          console.error('Email not found in session.');
+        }
 
         // Use ethers.js to connect to the provider
         const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -43,8 +59,45 @@ export default function WalletPage() {
       }
     }
 
+    // Listen for account changes in MetaMask
+    function handleAccountsChanged(accounts: string[]) {
+      if (accounts.length === 0) {
+        setError('MetaMask is locked or no accounts are available.');
+        setWalletAddress('');
+        setBalance(null);
+      } else {
+        const newAccount = accounts[0];
+        setWalletAddress(newAccount);
+        if (email) {
+          updateWalletAddress(newAccount, email); // Update the wallet address in the database
+        }
+        fetchAccountsAndBalance(); // Fetch the balance for the new account
+      }
+    }
+
     fetchAccountsAndBalance();
-  }, []);
+
+    // Attach the event listener for account changes
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+
+    // Cleanup the event listener on component unmount
+    return () => {
+      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+    };
+  }, [email]);
+
+  async function updateWalletAddress(address: string, email: string) {
+    try {
+      // Replace with the actual API endpoint to update the wallet address in the user database
+      await axios.post('http://localhost:9090/api/auth/updateWalletAddress', {
+        email,
+        walletAddress: address,
+      });
+      console.log('Wallet address updated successfully in the database.');
+    } catch (err) {
+      console.error('Error updating wallet address in the database:', err);
+    }
+  }
 
   const handleSend = () => {
     if (!sendAmount || isNaN(Number(sendAmount)) || Number(sendAmount) <= 0) {
