@@ -3,6 +3,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const { ethers } = require('ethers'); // Import ethers.js
+const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 
 // Initialize express app
 const app = express();
@@ -75,9 +77,60 @@ const borrowSchema = new mongoose.Schema({
 
 const Borrow = mongoose.model('Borrow', borrowSchema);
 
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'FlowFund API',
+      version: '1.0.0',
+      description: 'API documentation for FlowFund',
+    },
+    servers: [
+      {
+        url: 'http://localhost:9090', // Replace with your server URL
+      },
+    ],
+  },
+  apis: ['./server.js'], // Ensure this path points to the file with Swagger comments
+};
+
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
 // Routes
 // api changes starts here
 
+/**
+ * @swagger
+ * /api/auth/addUser:
+ *   post:
+ *     summary: Add a new user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: user@example.com
+ *               walletAddress:
+ *                 type: string
+ *                 example: 0x1234567890abcdef
+ *               privateKey:
+ *                 type: string
+ *                 example: 0xabcdef1234567890
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *       400:
+ *         description: Email is required
+ *       500:
+ *         description: Failed to register user
+ */
 app.post('/api/auth/addUser', async (req, res) => {
   const { email, walletAddress, privateKey } = req.body;
 
@@ -116,6 +169,32 @@ app.post('/api/auth/addUser', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Log in a user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: user@example.com
+ *     responses:
+ *       200:
+ *         description: Login timestamp updated successfully
+ *       400:
+ *         description: Email is required
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Failed to update login timestamp
+ */
 app.post('/api/auth/login', async (req, res) => {
   const { email } = req.body;
 
@@ -469,6 +548,57 @@ app.post('/api/user/updateCollateral', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/borrow:
+ *   post:
+ *     summary: Submit a borrow request
+ *     tags: [Borrow]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               contractId:
+ *                 type: string
+ *                 example: 0x1234567890abcdef
+ *               lenderEmail:
+ *                 type: string
+ *                 example: lender@example.com
+ *               borrowerUserEmail:
+ *                 type: string
+ *                 example: user@example.com
+ *               borrowAmount:
+ *                 type: number
+ *                 example: 1000
+ *               pendingAmount:
+ *                 type: number
+ *                 example: 1000
+ *               lastTransactionDetails:
+ *                 type: string
+ *                 example: Borrowed 1000 units
+ *               collateral:
+ *                 type: object
+ *                 properties:
+ *                   ethereumNetwork:
+ *                     type: string
+ *                     example: mainnet
+ *                   accountAddress:
+ *                     type: string
+ *                     example: 0xabcdef1234567890
+ *                   collateralAmount:
+ *                     type: number
+ *                     example: 2
+ *     responses:
+ *       201:
+ *         description: Borrow request submitted and contract executed successfully
+ *       400:
+ *         description: Missing required fields
+ *       500:
+ *         description: Failed to process borrow request
+ */
 app.post('/api/borrow', async (req, res) => {
   const {
     contractId,
@@ -589,6 +719,52 @@ app.post('/api/user/deleteAccount', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/payments:
+ *   get:
+ *     summary: Get payment details for a user
+ *     tags: [Payments]
+ *     parameters:
+ *       - in: query
+ *         name: userEmail
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Email of the user
+ *     responses:
+ *       200:
+ *         description: Payment details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 borrowAmount:
+ *                   type: number
+ *                   example: 1000
+ *                 pendingAmount:
+ *                   type: number
+ *                   example: 500
+ *                 interest:
+ *                   type: number
+ *                   example: 50
+ *                 totalAmountDue:
+ *                   type: number
+ *                   example: 550
+ *                 borrowDate:
+ *                   type: string
+ *                   example: 2023-01-01T00:00:00.000Z
+ *                 lenderEmail:
+ *                   type: string
+ *                   example: lender@example.com
+ *       400:
+ *         description: User email is required
+ *       404:
+ *         description: No pending loans found for this user
+ *       500:
+ *         description: Failed to fetch payment details
+ */
 app.get('/api/payments', async (req, res) => {
   const { userEmail } = req.query;
 
