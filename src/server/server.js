@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const { ethers, JsonRpcProvider } = require('ethers'); // Import ethers.js
+const { ethers } = require('ethers'); // Import ethers.js
 
 // Initialize express app
 const app = express();
@@ -40,7 +40,7 @@ const User = mongoose.model('User', userSchema);
 // Lender Schema
 const lenderSchema = new mongoose.Schema({
   contractId: { type: String, required: true }, // Dummy data for testnet
-  lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User'},
   userEmail: { type: String, required: true }, // Add user email to the schema
   lendingConditions: { type: String, required: true },
   initialLendingCapacity: { type: Number, required: true },
@@ -59,7 +59,7 @@ const Lender = mongoose.model('Lender', lenderSchema);
 // Borrow Schema
 const borrowSchema = new mongoose.Schema({
   contractId: { type: String, required: true },
-  lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lender', required: true },
+  lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lender'},
   lenderEmail: { type: String, required: true }, // Add lender email to the schema
   borrowerUserEmail: { type: String, required: true }, // Store the borrower's email
   borrowAmount: { type: Number, required: true },
@@ -472,8 +472,7 @@ app.post('/api/user/updateCollateral', async (req, res) => {
 app.post('/api/borrow', async (req, res) => {
   const {
     contractId,
-    lenderId,
-    lenderEmail, // Accept lender email from the frontend
+    lenderEmail,
     borrowerUserEmail,
     borrowAmount,
     pendingAmount,
@@ -482,21 +481,29 @@ app.post('/api/borrow', async (req, res) => {
   } = req.body;
 
   try {
-    if (!borrowerUserEmail || !lenderId || !lenderEmail || !borrowAmount || !pendingAmount || !collateral) {
+    if (
+      !contractId ||
+      !lenderEmail ||
+      !borrowerUserEmail ||
+      !borrowAmount ||
+      !pendingAmount ||
+      !collateral
+    ) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Validate that the lender exists
-    const lender = await Lender.findById(lenderId);
-    if (!lender) {
-      return res.status(404).json({ error: 'Lender not found' });
+    // Retrieve the private key from the User database
+    const user = await User.findOne({ userEmail: borrowerUserEmail });
+    if (!user || !user.privateKey) {
+      return res.status(404).json({ error: 'User not found or private key is missing.' });
     }
 
-    // Create a new borrow record with the lender's details
+    const privateKey = user.privateKey;
+
+    // Save the borrow record in the database
     const borrow = new Borrow({
-      contractId: lender.contractId, // Use the contract ID from the lender
-      lenderId: lender._id, // Use the lender's ID
-      lenderEmail, // Save the lender's email
+      contractId,
+      lenderEmail,
       borrowerUserEmail,
       borrowAmount,
       pendingAmount,
@@ -505,10 +512,53 @@ app.post('/api/borrow', async (req, res) => {
     });
 
     await borrow.save();
-    res.status(201).json({ message: 'Borrow record added successfully', borrow });
+
+    // Execute the borrow contract using Ethers.js
+    const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL); // Local Ethereum network
+    const signer = new ethers.Wallet(privateKey, provider); // Use the private key from the database
+
+    console.log('Signer address:', signer.address);
+    console.log('Contract ID:', contractId);
+
+    // Load the contract
+    const contractABI = [
+      "function submitCollateral() public payable",
+      "function borrow(uint256 amount) public",
+      "function collateral(address account) public view returns (uint256)",
+    ];
+    const lendingContract = new ethers.Contract(contractId, contractABI, signer);
+
+    console.log('Lending contract address:', lendingContract.address);
+
+    const collateralAmountInWei = ethers.utils.parseEther(collateral.collateralAmount.toString()); // Convert collateral amount to Wei
+    const borrowAmountInWei = ethers.utils.parseEther(borrowAmount.toString()); // Convert borrow amount to Wei
+
+    // Borrower submits collateral
+    await lendingContract.submitCollateral({ value: collateralAmountInWei });
+
+    console.log("Collateral submitted successfully.", collateralAmountInWei.toString());
+
+    // Borrower borrows ETH
+    await lendingContract.borrow(borrowAmountInWei);
+
+    // Check the contract's balance after borrowing
+    const contractBalance = await provider.getBalance(lendingContract.address);
+    console.log("Contract balance after borrowing:", ethers.utils.formatEther(contractBalance), "ETH");
+
+    // // Check the borrower's collateral (handle default value)
+    // const collateralBalance = await lendingContract.collateral(user.walletAddress);
+    // if (collateralBalance.eq(0)) {
+    //   console.log("No collateral found for the given address.");
+    // } else {
+    //   console.log("Borrower's collateral balance:", ethers.utils.formatEther(collateralBalance), "ETH");
+    // }
+
+    res.status(201).json({
+      message: 'Borrow request submitted and contract executed successfully.',
+    });
   } catch (error) {
-    console.error('Error adding borrow record:', error);
-    res.status(500).json({ error: 'Failed to add borrow record' });
+    console.error('Error processing borrow request:', error);
+    res.status(500).json({ error: 'Failed to process borrow request.' });
   }
 });
 

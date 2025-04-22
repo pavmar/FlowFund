@@ -37,7 +37,12 @@ export default function BorrowPage() {
   const fetchLenders = async () => {
     try {
       const response = await axios.get('http://localhost:9090/api/lenders'); // Backend endpoint to fetch lenders
-      setLenders(response.data);
+      const allLenders = response.data;
+
+      // Filter out lenders with the same email as the logged-in user
+      const filteredLenders = allLenders.filter((lender: Lender) => lender.userEmail !== userEmail);
+
+      setLenders(filteredLenders);
     } catch (error) {
       console.error('Error fetching lenders:', error);
       alert('Failed to fetch lenders. Please try again later.');
@@ -105,6 +110,16 @@ export default function BorrowPage() {
       return;
     }
 
+    if (!ethereumNetwork || !accountAddress || !collateralAmount || collateralAmount <= 0) {
+      setBorrowError('Please provide valid collateral details.');
+      return;
+    }
+
+    if (!borrowAmount || borrowAmount <= 0) {
+      setBorrowError('Please enter a valid borrow amount.');
+      return;
+    }
+
     try {
       const response = await axios.post('http://localhost:9090/api/borrow', {
         contractId: lenderDetails.contractId, // Pass the contract ID of the lender
@@ -113,7 +128,6 @@ export default function BorrowPage() {
         borrowAmount, // Borrow amount entered by the user
         pendingAmount: borrowAmount, // Initially, pending amount is the same as borrow amount
         lastTransactionDetails: `Borrowed ${borrowAmount} units`, // Transaction details
-        lenderId: lenderDetails._id, // Lender ID
         collateral: {
           ethereumNetwork,
           accountAddress,
@@ -122,7 +136,7 @@ export default function BorrowPage() {
       });
 
       if (response.status === 201) {
-        alert('Borrow request submitted successfully!');
+        alert(`Borrow request submitted successfully! Transaction Hash: ${response.data.transactionHash}`);
         setBorrowAmount('');
         setEthereumNetwork('');
         setAccountAddress('');
