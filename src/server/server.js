@@ -5,6 +5,8 @@ const cors = require('cors');
 const { ethers } = require('ethers'); // Import ethers.js
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const fs = require('fs');
+const path = require('path');
 
 // Initialize express app
 const app = express();
@@ -241,6 +243,22 @@ app.post('/api/lender/activate', async (req, res) => {
       await user.save();
     }
 
+    // Load ABI and bytecode from LendingContract.json
+    const contractPath = path.join(__dirname, '../../contract/artifacts/src/LendingContract.sol/LendingContract.json');
+    const contractJson = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
+    const { abi, bytecode } = contractJson;
+
+    // Deploy a new LendingContract for the lender
+    const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL); // Ensure this is set correctly
+    const signer = new ethers.Wallet(user.privateKey, provider); // Use the lender's private key
+
+    const contractFactory = new ethers.ContractFactory(abi, bytecode, signer);
+
+    console.log("Deploying LendingContract...");
+    const lendingContract = await contractFactory.deploy();
+    await lendingContract.deployed();
+    console.log("LendingContract deployed at:", lendingContract.address);
+
     // Check if the lender record already exists
     let lender = await Lender.findOne({ lenderId: user._id });
     if (lender) {
@@ -249,11 +267,12 @@ app.post('/api/lender/activate', async (req, res) => {
       lender.durationDays = durationDays;
       lender.minBorrowAmount = minBorrowAmount;
       lender.userEmail = email; // Update the email field
+      lender.contractId = lendingContract.address; // Assign the deployed contract address
       await lender.save();
     } else {
       // Create a new lender record
       lender = new Lender({
-        contractId: user.walletAddress, // Assuming walletAddress is used as contractId
+        contractId: lendingContract.address, // Assign the deployed contract address
         lenderId: user._id,
         userEmail: email, // Save the user's email
         lendingConditions: `Interest: ${interestRate}%, Duration: ${durationDays} days`,
@@ -601,26 +620,35 @@ app.post('/api/user/updateCollateral', async (req, res) => {
  */
 app.post('/api/borrow', async (req, res) => {
   const {
-    contractId,
     lenderEmail,
     borrowerUserEmail,
     borrowAmount,
     pendingAmount,
     lastTransactionDetails,
-    collateral,
+    collateral, // Collateral details from the frontend
   } = req.body;
 
   try {
     if (
-      !contractId ||
       !lenderEmail ||
       !borrowerUserEmail ||
       !borrowAmount ||
       !pendingAmount ||
-      !collateral
+      !collateral ||
+      !collateral.ethereumNetwork ||
+      !collateral.accountAddress ||
+      !collateral.collateralAmount
     ) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+
+    // Retrieve the lender's contractId from the Lender database
+    const lender = await Lender.findOne({ userEmail: lenderEmail });
+    if (!lender) {
+      return res.status(404).json({ error: 'Lender not found' });
+    }
+
+    const contractId = lender.contractId; // Get the contract ID from the lender record
 
     // Retrieve the private key from the User database
     const user = await User.findOne({ userEmail: borrowerUserEmail });
@@ -638,10 +666,15 @@ app.post('/api/borrow', async (req, res) => {
       borrowAmount,
       pendingAmount,
       lastTransactionDetails,
-      collateral,
+      collateral, // Save the collateral details from the frontend
     });
 
     await borrow.save();
+
+    // Load ABI from LendingContract.json
+    const contractPath = path.join(__dirname, '../../contract/artifacts/src/LendingContract.sol/LendingContract.json');
+    const contractJson = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
+    const { abi } = contractJson;
 
     // Execute the borrow contract using Ethers.js
     const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL); // Local Ethereum network
@@ -651,12 +684,7 @@ app.post('/api/borrow', async (req, res) => {
     console.log('Contract ID:', contractId);
 
     // Load the contract
-    const contractABI = [
-      "function submitCollateral() public payable",
-      "function borrow(uint256 amount) public",
-      "function collateral(address account) public view returns (uint256)",
-    ];
-    const lendingContract = new ethers.Contract(contractId, contractABI, signer);
+    const lendingContract = new ethers.Contract(contractId, abi, signer);
 
     console.log('Lending contract address:', lendingContract.address);
 
@@ -664,24 +692,23 @@ app.post('/api/borrow', async (req, res) => {
     const borrowAmountInWei = ethers.utils.parseEther(borrowAmount.toString()); // Convert borrow amount to Wei
 
     // Borrower submits collateral
-    await lendingContract.submitCollateral({ value: collateralAmountInWei });
+    const borrowerAddress = await signer.getAddress(); // Resolve the Promise to get the address
+    console.log("Borrower address:", borrowerAddress);
+
+    const borrowerContract = lendingContract.connect(signer); // Use the signer directly
+    console.log("Submitting collateral:", collateralAmountInWei.toString(), "Wei");
+    await borrowerContract.submitCollateral({ value: collateralAmountInWei });
 
     console.log("Collateral submitted successfully.", collateralAmountInWei.toString());
 
     // Borrower borrows ETH
-    await lendingContract.borrow(borrowAmountInWei);
+    await borrowerContract.borrow(borrowAmountInWei);
+
+    console.log("Borrow request executed successfully.");
 
     // Check the contract's balance after borrowing
     const contractBalance = await provider.getBalance(lendingContract.address);
     console.log("Contract balance after borrowing:", ethers.utils.formatEther(contractBalance), "ETH");
-
-    // // Check the borrower's collateral (handle default value)
-    // const collateralBalance = await lendingContract.collateral(user.walletAddress);
-    // if (collateralBalance.eq(0)) {
-    //   console.log("No collateral found for the given address.");
-    // } else {
-    //   console.log("Borrower's collateral balance:", ethers.utils.formatEther(collateralBalance), "ETH");
-    // }
 
     res.status(201).json({
       message: 'Borrow request submitted and contract executed successfully.',
@@ -802,6 +829,29 @@ app.get('/api/payments', async (req, res) => {
   } catch (error) {
     console.error('Error fetching payment details:', error);
     res.status(500).json({ error: 'Failed to fetch payment details.' });
+  }
+});
+
+app.get('/api/user/wallet', async (req, res) => {
+  const { email } = req.query;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const user = await User.findOne({ userEmail: email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({
+      walletAddress: user.walletAddress || null,
+      privateKey: user.privateKey || null,
+    });
+  } catch (error) {
+    console.error('Error fetching wallet details:', error);
+    res.status(500).json({ error: 'Failed to fetch wallet details' });
   }
 });
 

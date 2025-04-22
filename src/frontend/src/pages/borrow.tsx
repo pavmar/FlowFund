@@ -5,6 +5,7 @@ import Grid from '@mui/material/Grid';
 import { Card, CardContent, Button, Radio, RadioGroup, FormControlLabel, TextField } from '@mui/material';
 import axios from 'axios';
 import { useSession } from '../SessionContext'; // Import the session context
+import { Link } from 'react-router-dom'; // Import Link for navigation
 
 export default function BorrowPage() {
   const { session } = useSession(); // Access the session
@@ -23,15 +24,13 @@ export default function BorrowPage() {
   const [lenders, setLenders] = React.useState<Lender[]>([]);
   const [selectedLender, setSelectedLender] = React.useState<string | null>(null);
   const [borrowAmount, setBorrowAmount] = React.useState<number | ''>('');
+  const [pendingAmount, setPendingAmount] = React.useState<number | ''>('');
   const [ethereumNetwork, setEthereumNetwork] = React.useState('');
   const [accountAddress, setAccountAddress] = React.useState('');
   const [collateralAmount, setCollateralAmount] = React.useState<number | ''>('');
-  const [collateralAddress, setCollateralAddress] = React.useState<string | ''>('');
-  const [pendingAmount, setPendingAmount] = React.useState<number | null>(null);
-  const [borrowError, setBorrowError] = React.useState<string | null>(null);
-  const [isEditingCollateral, setIsEditingCollateral] = React.useState(false);
-  const [collateralError, setCollateralError] = React.useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
+  const [walletError, setWalletError] = React.useState<string | null>(null);
+  const [walletReady, setWalletReady] = React.useState<boolean>(false);
+  const [hasExistingBorrow, setHasExistingBorrow] = React.useState<boolean>(false);
 
   // Fetch lenders from the database
   const fetchLenders = async () => {
@@ -49,9 +48,32 @@ export default function BorrowPage() {
     }
   };
 
+  // Check if wallet address and private key are set
+  const checkWallet = async () => {
+    try {
+      const response = await axios.get(`http://localhost:9090/api/user/wallet?email=${userEmail}`);
+      const { walletAddress, privateKey } = response.data;
+
+      if (!walletAddress || !privateKey) {
+        setWalletError('Please set your wallet address and private key in the Wallet page.');
+        setWalletReady(false);
+      } else {
+        setWalletError(null);
+        setWalletReady(true);
+      }
+    } catch (error) {
+      console.error('Error checking wallet details:', error);
+      setWalletError('Failed to verify wallet details. Please try again later.');
+      setWalletReady(false);
+    }
+  };
+
   React.useEffect(() => {
     fetchLenders();
-  }, []);
+    if (userEmail) {
+      checkWallet();
+    }
+  }, [userEmail]);
 
   const handleSelectLender = async (lenderId: string, lenderEmail: string) => {
     setSelectedLender(lenderId);
@@ -62,116 +84,70 @@ export default function BorrowPage() {
         lenderEmail: lenderEmail, // Lender's email
       });
 
+      console.log('Response from /api/searchBorrow:', response.data);
+
       if (response.status === 200 && response.data.borrow) {
         const borrow = response.data.borrow;
 
-        // Preload the collateral box with details from the database
-        setPendingAmount(borrow.pendingAmount);
-        setEthereumNetwork(borrow.collateral.ethereumNetwork || '');
-        setAccountAddress(borrow.collateral.accountAddress || '');
-        setCollateralAmount(borrow.collateral.collateralAmount || '');
+        // If a matching borrow record is found, display borrowed and pending amounts
+        setBorrowAmount(borrow.borrowAmount || '');
+        setPendingAmount(borrow.pendingAmount || '');
+        setHasExistingBorrow(true); // Indicate that an existing borrow record exists
       } else {
         // Clear the collateral box if no borrow record exists
-        setPendingAmount(null);
         setEthereumNetwork('');
         setAccountAddress('');
         setCollateralAmount('');
-      }
+              }
     } catch (error) {
       console.error('Error fetching borrow record:', error);
       alert('Failed to fetch borrow record.');
     }
   };
 
-  const handleRepay = async () => {
-    if (!selectedLender || !pendingAmount || pendingAmount <= 0) {
-      alert('No pending amount to repay.');
-      return;
-    }
-
-    try {
-      // Add logic to handle repayment
-      alert('Repayment functionality is not implemented yet.');
-    } catch (error) {
-      console.error('Error processing repayment:', error);
-      alert('Failed to process repayment.');
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedLender) {
-      setBorrowError('No lender selected.');
-      return;
-    }
-
-    const lenderDetails = lenders.find((lender: any) => lender._id === selectedLender);
-    if (!lenderDetails) {
-      setBorrowError('Selected lender details not found.');
-      return;
-    }
-
-    if (!ethereumNetwork || !accountAddress || !collateralAmount || collateralAmount <= 0) {
-      setBorrowError('Please provide valid collateral details.');
-      return;
-    }
-
-    if (!borrowAmount || borrowAmount <= 0) {
-      setBorrowError('Please enter a valid borrow amount.');
+  const handleBorrow = async () => {
+    if (!selectedLender || !borrowAmount || !collateralAmount || !ethereumNetwork || !accountAddress) {
+      alert('Please fill in all fields and select a lender.');
       return;
     }
 
     try {
       const response = await axios.post('http://localhost:9090/api/borrow', {
-        contractId: lenderDetails.contractId, // Pass the contract ID of the lender
-        lenderEmail: lenderDetails.userEmail, // Pass the lender's email
-        borrowerUserEmail: userEmail, // Borrower's email
-        borrowAmount, // Borrow amount entered by the user
-        pendingAmount: borrowAmount, // Initially, pending amount is the same as borrow amount
-        lastTransactionDetails: `Borrowed ${borrowAmount} units`, // Transaction details
+        lenderEmail: lenders.find((lender) => lender._id === selectedLender)?.userEmail,
+        borrowerUserEmail: userEmail,
+        borrowAmount,
+        pendingAmount: borrowAmount,
+        lastTransactionDetails: `Borrowed ${borrowAmount} units`,
         collateral: {
           ethereumNetwork,
           accountAddress,
           collateralAmount,
-        }, // Collateral details
+        },
       });
 
       if (response.status === 201) {
-        alert(`Borrow request submitted successfully! Transaction Hash: ${response.data.transactionHash}`);
+        alert('Borrow request submitted successfully!');
         setBorrowAmount('');
+        setCollateralAmount('');
         setEthereumNetwork('');
         setAccountAddress('');
-        setCollateralAmount('');
-        setSelectedLender(null);
       }
     } catch (error) {
       console.error('Error submitting borrow request:', error);
-      setBorrowError('Failed to submit borrow request.');
-    }
-  };
-
-  const handleSaveCollateral = async () => {
-    if (!collateralAddress || !collateralAmount || collateralAmount <= 0) {
-      setCollateralError('Please provide valid collateral details.');
-      return;
-    }
-
-    try {
-      // Add logic to save collateral details
-      setSuccessMessage('Collateral details saved successfully!');
-      setCollateralError(null);
-      setIsEditingCollateral(false);
-    } catch (error) {
-      console.error('Error saving collateral details:', error);
-      setCollateralError('Failed to save collateral details.');
+      alert('Failed to submit borrow request.');
     }
   };
 
   return (
     <Box sx={{ flexGrow: 1, p: 2 }}>
-
       <Typography variant="h4" gutterBottom>
         Available Lenders
       </Typography>
+      {walletError && (
+        <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+          {walletError}
+        </Typography>
+      )}
       <Grid container spacing={2}>
         {lenders.map((lender: any) => (
           <Grid item xs={12} sm={6} md={4} key={lender._id}>
@@ -197,6 +173,7 @@ export default function BorrowPage() {
                     value={lender._id}
                     control={<Radio />}
                     label="Select"
+                    disabled={!walletReady} // Disable if wallet is not ready
                   />
                 </RadioGroup>
               </CardContent>
@@ -204,63 +181,68 @@ export default function BorrowPage() {
           </Grid>
         ))}
       </Grid>
-      {selectedLender && (
-        <Box sx={{ mt: 4, p: 2, border: '1px solid #ccc', borderRadius: 4 }}>
+      {selectedLender && hasExistingBorrow && ( // Display existing borrow details if found
+        <Box sx={{ mt: 4, p: 2, border: '1px solid #ccc', borderRadius: '8px' }}>
           <Typography variant="h6" gutterBottom>
-            Collateral and Borrow Details
+            Existing Borrow Details
+          </Typography>
+          <Typography>
+            Borrowed Amount: {borrowAmount} ETH
+          </Typography>
+          <Typography>
+            Pending Amount: {pendingAmount} ETH
+          </Typography>
+          <Link to="/payments" style={{ textDecoration: 'none' }}>
+            <Button variant="contained" color="primary" sx={{ mt: 2 }}>
+              Go to Payments
+            </Button>
+          </Link>
+        </Box>
+      )}
+      {selectedLender && !hasExistingBorrow && ( // Display borrow details box if no existing borrow record
+        <Box sx={{ mt: 4, p: 2, border: '1px solid #ccc', borderRadius: '8px' }}>
+          <Typography variant="h6" gutterBottom>
+            Borrow Details
           </Typography>
           <TextField
-            id="ethereumNetwork"
             label="Ethereum Network"
-            variant="outlined"
             fullWidth
+            margin="normal"
             value={ethereumNetwork}
             onChange={(e) => setEthereumNetwork(e.target.value)}
-            sx={{ mb: 2 }}
           />
           <TextField
-            id="accountAddress"
             label="Account Address"
-            variant="outlined"
             fullWidth
+            margin="normal"
             value={accountAddress}
             onChange={(e) => setAccountAddress(e.target.value)}
-            sx={{ mb: 2 }}
           />
           <TextField
-            id="collateralAmount"
-            label="Collateral Amount"
+            label="Collateral Amount (ETH)"
             type="number"
-            variant="outlined"
             fullWidth
+            margin="normal"
             value={collateralAmount}
             onChange={(e) => setCollateralAmount(Number(e.target.value))}
-            sx={{ mb: 2 }}
           />
           <TextField
-            id="borrowAmount"
             label="Borrow Amount"
             type="number"
-            variant="outlined"
             fullWidth
+            margin="normal"
             value={borrowAmount}
             onChange={(e) => setBorrowAmount(Number(e.target.value))}
-            sx={{ mb: 2 }}
           />
           <Button
             variant="contained"
             color="primary"
-            onClick={handleSubmit}
-            disabled={
-              !ethereumNetwork ||
-              !accountAddress ||
-              !collateralAmount ||
-              collateralAmount <= 0 ||
-              !borrowAmount ||
-              borrowAmount <= 0
-            }
+            fullWidth
+            sx={{ mt: 2 }}
+            onClick={handleBorrow}
+            disabled={!walletReady || !selectedLender}
           >
-            Submit
+            Borrow
           </Button>
         </Box>
       )}
