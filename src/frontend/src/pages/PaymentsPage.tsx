@@ -45,7 +45,7 @@ export default function PaymentsPage() {
 
     try {
       const response = await axios.post('http://localhost:9090/api/repay', {
-        userEmail,
+        borrowerUserEmail: userEmail,
         repayAmount,
       });
 
@@ -67,7 +67,7 @@ export default function PaymentsPage() {
   return (
     <Box sx={{ padding: 2 }}>
       <Typography variant="h4" gutterBottom>
-        Payments
+        Loan details
       </Typography>
 
       {error && (
@@ -84,13 +84,14 @@ export default function PaymentsPage() {
 
       {loanDetails ? (
         <Box>
-          <Typography variant="h6">Loan Details</Typography>
-          <Typography>Borrow Amount: {loanDetails.borrowAmount} ETH</Typography>
-          <Typography>Pending Amount: {loanDetails.pendingAmount} ETH</Typography>
-          <Typography>Interest: {loanDetails.interest.toFixed(4)} ETH</Typography>
-          <Typography>Total Amount Due: {loanDetails.totalAmountDue.toFixed(4)} ETH</Typography>
-          <Typography>Borrow Date: {new Date(loanDetails.borrowDate).toLocaleDateString()}</Typography>
-          <Typography>Lender Email: {loanDetails.lenderEmail}</Typography>
+          <Box sx={{ mt: 2, p: 2, border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+            <Typography>Borrow Amount: {loanDetails.borrowAmount} ETH</Typography>
+            <Typography>Pending Amount: {loanDetails.pendingAmount} ETH</Typography>
+            <Typography>Interest: {loanDetails.interest.toFixed(4)} ETH</Typography>
+            <Typography>Total Amount Due: {loanDetails.totalAmountDue.toFixed(4)} ETH</Typography>
+            <Typography>Borrow Date: {new Date(loanDetails.borrowDate).toLocaleDateString()}</Typography>
+            <Typography>Lender Email: {loanDetails.lenderEmail}</Typography>
+          </Box>
 
           <TextField
             label="Repayment Amount"

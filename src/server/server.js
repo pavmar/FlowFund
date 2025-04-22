@@ -869,6 +869,99 @@ app.get('/api/user/wallet', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/repay:
+ *   post:
+ *     summary: Repay a portion of the borrowed ETH
+ *     tags: [Repay]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               borrowerUserEmail:
+ *                 type: string
+ *                 example: user@example.com
+ *               repayAmount:
+ *                 type: number
+ *                 example: 0.5
+ *     responses:
+ *       200:
+ *         description: Repayment processed successfully
+ *       400:
+ *         description: Missing required fields or invalid repayment amount
+ *       404:
+ *         description: Borrow record not found
+ *       500:
+ *         description: Failed to process repayment
+ */
+app.post('/api/repay', async (req, res) => {
+  const { borrowerUserEmail, repayAmount } = req.body;
+
+  try {
+    if (!borrowerUserEmail || !repayAmount || repayAmount <= 0) {
+      return res.status(400).json({ error: 'Invalid borrower email or repayment amount' });
+    }
+
+    // Fetch the borrow record for the user
+    const borrow = await Borrow.findOne({ borrowerUserEmail, pendingAmount: { $gt: 0 } });
+    if (!borrow) {
+      return res.status(404).json({ error: 'No active borrow record found for this user' });
+    }
+
+    // Fetch the lender's contract ID
+    const lender = await Lender.findOne({ userEmail: borrow.lenderEmail });
+    if (!lender) {
+      return res.status(404).json({ error: 'Lender not found for this loan' });
+    }
+
+    const contractId = lender.contractId;
+
+    // Retrieve the borrower's private key
+    const user = await User.findOne({ userEmail: borrowerUserEmail });
+    if (!user || !user.privateKey) {
+      return res.status(404).json({ error: 'User not found or private key is missing' });
+    }
+
+    const privateKey = user.privateKey;
+
+    // Load ABI from LendingContract.json
+    const contractPath = path.join(__dirname, '../../contract/artifacts/src/LendingContract.sol/LendingContract.json');
+    const contractJson = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
+    const { abi } = contractJson;
+
+    // Interact with the smart contract
+    const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL);
+    const signer = new ethers.Wallet(privateKey, provider);
+    const lendingContract = new ethers.Contract(contractId, abi, signer);
+
+    const repayAmountInWei = ethers.utils.parseEther(repayAmount.toString()); // Convert to Wei
+
+    console.log('Processing repayment:', repayAmountInWei.toString(), 'Wei');
+    await lendingContract.repay({ value: repayAmountInWei });
+
+    console.log('Repayment processed successfully.');
+
+    // Update the borrow record in the database
+    borrow.pendingAmount -= repayAmount;
+    if (borrow.pendingAmount < 0) {
+      borrow.pendingAmount = 0; // Ensure pending amount doesn't go negative
+    }
+    await borrow.save();
+
+    res.status(200).json({
+      message: 'Repayment processed successfully',
+      updatedPendingAmount: borrow.pendingAmount,
+    });
+  } catch (error) {
+    console.error('Error processing repayment:', error);
+    res.status(500).json({ error: 'Failed to process repayment' });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 9090;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
