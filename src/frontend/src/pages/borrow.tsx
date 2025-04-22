@@ -204,28 +204,33 @@ export default function BorrowPage() {
           <Typography variant="h6" gutterBottom>
             Borrow Details
           </Typography>
-          <TextField
-            label="Ethereum Network"
-            fullWidth
-            margin="normal"
-            value={ethereumNetwork}
-            onChange={(e) => setEthereumNetwork(e.target.value)}
-          />
-          <TextField
-            label="Account Address"
-            fullWidth
-            margin="normal"
-            value={accountAddress}
-            onChange={(e) => setAccountAddress(e.target.value)}
-          />
-          <TextField
-            label="Collateral Amount (ETH)"
-            type="number"
-            fullWidth
-            margin="normal"
-            value={collateralAmount}
-            onChange={(e) => setCollateralAmount(Number(e.target.value))}
-          />
+          <Box sx={{ mt: 2, p: 2, border: '1px solid #ccc', borderRadius: '8px' }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Collateral
+            </Typography>
+            <TextField
+              label="Ethereum Network"
+              fullWidth
+              margin="normal"
+              value={ethereumNetwork}
+              onChange={(e) => setEthereumNetwork(e.target.value)}
+            />
+            <TextField
+              label="Account Address"
+              fullWidth
+              margin="normal"
+              value={accountAddress}
+              onChange={(e) => setAccountAddress(e.target.value)}
+            />
+            <TextField
+              label="Collateral Amount (ETH)"
+              type="number"
+              fullWidth
+              margin="normal"
+              value={collateralAmount}
+              onChange={(e) => setCollateralAmount(Number(e.target.value))}
+            />
+          </Box>
           <TextField
             label="Borrow Amount"
             type="number"
