@@ -11,6 +11,8 @@ import WalletPage from './pages/wallet';
 import AboutPage from './pages/about';
 import SettingsPage from './pages/settings';
 import SignUp from './pages/signup';
+import { Payment } from '@mui/icons-material';
+import PaymentsPage from './pages/PaymentsPage';
 
 const router = createBrowserRouter([
   {
@@ -43,6 +45,10 @@ const router = createBrowserRouter([
           {
             path: 'settings',
             Component: SettingsPage,
+          },
+          {
+            path: 'payments',
+            Component: PaymentsPage
           }
         ],
       },

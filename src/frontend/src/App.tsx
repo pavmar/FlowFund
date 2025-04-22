@@ -6,7 +6,7 @@ import { ReactRouterAppProvider } from '@toolpad/core/react-router';
 import type { Navigation, Authentication } from '@toolpad/core/AppProvider';
 import { firebaseSignOut, onAuthStateChanged } from './firebase/auth';
 import SessionContext, { type Session } from './SessionContext';
-import { CurrencyBitcoinRounded, PermIdentity, PermIdentityTwoTone, SellRounded, SettingsRounded, WalletRounded } from '@mui/icons-material';
+import { CurrencyBitcoinRounded, PaymentRounded, PermIdentity, PermIdentityTwoTone, SellRounded, SettingsRounded, WalletRounded } from '@mui/icons-material';
 
 const NAVIGATION: Navigation = [
   {
@@ -29,14 +29,19 @@ const NAVIGATION: Navigation = [
     icon: <SellRounded />,
   },
   {
-    segment: 'About',
-    title: 'About',
-    icon: <PermIdentityTwoTone />,
-  },
-  {
     segment: 'Settings',
     title: 'Settings',
     icon: <SettingsRounded />,
+  },
+  {
+    segment: 'Payments',
+    title: 'Payments',
+    icon: <PaymentRounded />,
+  },
+  {
+    segment: 'About',
+    title: 'About',
+    icon: <PermIdentityTwoTone />,
   }
 
 ];

@@ -589,6 +589,46 @@ app.post('/api/user/deleteAccount', async (req, res) => {
   }
 });
 
+app.get('/api/payments', async (req, res) => {
+  const { userEmail } = req.query;
+
+  try {
+    if (!userEmail) {
+      return res.status(400).json({ error: 'User email is required' });
+    }
+
+    // Fetch the borrow record for the user
+    const borrow = await Borrow.findOne({ borrowerUserEmail: userEmail, pendingAmount: { $gt: 0 } });
+    if (!borrow) {
+      return res.status(404).json({ error: 'No pending loans found for this user.' });
+    }
+
+    // Fetch the lender details to get the interest rate
+    const lender = await Lender.findOne({ userEmail: borrow.lenderEmail });
+    if (!lender) {
+      return res.status(404).json({ error: 'Lender not found for this loan.' });
+    }
+
+    // Calculate interest
+    const borrowDate = new Date(borrow.borrowDate);
+    const currentDate = new Date();
+    const daysElapsed = Math.ceil((currentDate - borrowDate) / (1000 * 60 * 60 * 24)); // Days between dates
+    const interest = (borrow.borrowAmount * lender.interestRate * daysElapsed) / 36500; // Simple interest formula
+
+    res.status(200).json({
+      borrowAmount: borrow.borrowAmount,
+      pendingAmount: borrow.pendingAmount,
+      interest,
+      totalAmountDue: borrow.pendingAmount + interest,
+      borrowDate,
+      lenderEmail: borrow.lenderEmail,
+    });
+  } catch (error) {
+    console.error('Error fetching payment details:', error);
+    res.status(500).json({ error: 'Failed to fetch payment details.' });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 9090;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
