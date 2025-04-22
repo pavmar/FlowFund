@@ -259,6 +259,20 @@ app.post('/api/lender/activate', async (req, res) => {
     await lendingContract.deployed();
     console.log("LendingContract deployed at:", lendingContract.address);
 
+    const lenderContract = lendingContract.connect(signer);
+    
+    const lendAmount = ethers.utils.parseEther(minBorrowAmount.toString()); // Convert to Wei
+    await lenderContract.lend({ value: lendAmount });
+    console.log("Lender has lent:", ethers.utils.formatEther(lendAmount), "ETH");
+
+    // Check the lender's balance in the contract
+    const lenderBalance = await lendingContract.balances(signer.address);
+    console.log("Lender balance in contract:", ethers.utils.formatEther(lenderBalance), "ETH");
+
+    // Check the contract's balance after lending
+    const contractBalance = await provider.getBalance(lendingContract.address); // Use the provider instance
+    console.log("Contract balance after lending:", ethers.utils.formatEther(contractBalance), "ETH");
+
     // Check if the lender record already exists
     let lender = await Lender.findOne({ lenderId: user._id });
     if (lender) {
