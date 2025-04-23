@@ -989,6 +989,36 @@ app.post('/api/repay', async (req, res) => {
   }
 });
 
+app.get('/api/borrowers/count', async (req, res) => {
+  try {
+    const count = await Borrow.countDocuments({ pendingAmount: { $gt: 0 } });
+    res.status(200).json({ count });
+  } catch (error) {
+    console.error('Error fetching borrowers count:', error);
+    res.status(500).json({ error: 'Failed to fetch borrowers count' });
+  }
+});
+
+app.get('/api/lenders/count', async (req, res) => {
+  try {
+    const count = await Lender.countDocuments({});
+    res.status(200).json({ count });
+  } catch (error) {
+    console.error('Error fetching lenders count:', error);
+    res.status(500).json({ error: 'Failed to fetch lenders count' });
+  }
+});
+
+app.get('/api/pastLoans/count', async (req, res) => {
+  try {
+    const count = await PastLoan.countDocuments({});
+    res.status(200).json({ count });
+  } catch (error) {
+    console.error('Error fetching past loans count:', error);
+    res.status(500).json({ error: 'Failed to fetch past loans count' });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 9090;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

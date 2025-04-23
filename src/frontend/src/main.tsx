@@ -13,6 +13,7 @@ import SettingsPage from './pages/settings';
 import SignUp from './pages/signup';
 import { Payment } from '@mui/icons-material';
 import PaymentsPage from './pages/PaymentsPage';
+import Home from './Home'
 
 const router = createBrowserRouter([
   {
@@ -59,6 +60,10 @@ const router = createBrowserRouter([
       {
         path : '/sign-up',
         Component: SignUp,
+      },
+      {
+        path: '/home',
+        Component: Home,
       }
     ],
   },
