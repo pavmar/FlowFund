@@ -947,14 +947,17 @@ app.post('/api/repay', async (req, res) => {
 
     // Update the borrow record in the database
     borrow.pendingAmount -= repayAmount;
-    if (borrow.pendingAmount < 0) {
-      borrow.pendingAmount = 0; // Ensure pending amount doesn't go negative
+    if (borrow.pendingAmount <= 0) {
+      // If pendingAmount is zero or less, delete the borrow record
+      await Borrow.deleteOne({ _id: borrow._id });
+      console.log('Borrow record deleted as pending amount is zero.');
+    } else {
+      await borrow.save();
     }
-    await borrow.save();
 
     res.status(200).json({
       message: 'Repayment processed successfully',
-      updatedPendingAmount: borrow.pendingAmount,
+      updatedPendingAmount: borrow.pendingAmount > 0 ? borrow.pendingAmount : 0,
     });
   } catch (error) {
     console.error('Error processing repayment:', error);
