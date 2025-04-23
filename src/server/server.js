@@ -263,7 +263,7 @@ app.post('/api/lender/activate', async (req, res) => {
     }
 
     // Load ABI and bytecode from LendingContract.json
-    const contractPath = path.join(__dirname, '../../contract/artifacts/src/LendingContract.sol/LendingContract.json');
+    const contractPath = path.join(__dirname, 'contract/artifacts/src/LendingContract.sol/LendingContract.json');
     const contractJson = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
     const { abi, bytecode } = contractJson;
 
@@ -705,7 +705,7 @@ app.post('/api/borrow', async (req, res) => {
     await borrow.save();
 
     // Load ABI from LendingContract.json
-    const contractPath = path.join(__dirname, '../../contract/artifacts/src/LendingContract.sol/LendingContract.json');
+    const contractPath = path.join(__dirname, 'contract/artifacts/src/LendingContract.sol/LendingContract.json');
     const contractJson = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
     const { abi } = contractJson;
 
@@ -948,7 +948,7 @@ app.post('/api/repay', async (req, res) => {
     const privateKey = user.privateKey;
 
     // Load ABI from LendingContract.json
-    const contractPath = path.join(__dirname, '../../contract/artifacts/src/LendingContract.sol/LendingContract.json');
+    const contractPath = path.join(__dirname, 'contract/artifacts/src/LendingContract.sol/LendingContract.json');
     const contractJson = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
     const { abi } = contractJson;
 
@@ -1055,7 +1055,7 @@ app.post('/api/lender/withdraw', async (req, res) => {
 
     const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL);
     const signer = new ethers.Wallet(user.privateKey, provider); // Use lender's private key
-    const contractPath = path.join(__dirname, '../../contract/artifacts/src/LendingContract.sol/LendingContract.json');
+    const contractPath = path.join(__dirname, 'contract/artifacts/src/LendingContract.sol/LendingContract.json');
     const contractJson = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
     const { abi } = contractJson;
 
