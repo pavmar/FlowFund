@@ -2,7 +2,7 @@
   "name": "toolbox",
   "version": "0.1.0",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "preview": "vite preview"
   },
   "dependencies": {
