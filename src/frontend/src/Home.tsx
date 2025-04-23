@@ -42,15 +42,39 @@ export default function Home() {
       <h1>Welcome to FlowFund</h1>
       <p>Track your lending and borrowing activities seamlessly.</p>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '20px' }}>
-        <div style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px' }}>
+        <div
+          style={{
+            border: '1px solid #ccc',
+            padding: '20px',
+            borderRadius: '8px',
+            backgroundColor: '#e3f2fd', // Light blue for Active Borrowers
+            color: '#0d47a1', // Dark blue text
+          }}
+        >
           <h2>Active Borrowers</h2>
           <p>{stats.activeBorrowers}</p>
         </div>
-        <div style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px' }}>
+        <div
+          style={{
+            border: '1px solid #ccc',
+            padding: '20px',
+            borderRadius: '8px',
+            backgroundColor: '#e8f5e9', // Light green for Active Lenders
+            color: '#1b5e20', // Dark green text
+          }}
+        >
           <h2>Active Lenders</h2>
           <p>{stats.activeLenders}</p>
         </div>
-        <div style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px' }}>
+        <div
+          style={{
+            border: '1px solid #ccc',
+            padding: '20px',
+            borderRadius: '8px',
+            backgroundColor: '#fbe9e7', // Light red for Past Loans
+            color: '#b71c1c', // Dark red text
+          }}
+        >
           <h2>Past Loans</h2>
           <p>{stats.pastLoans}</p>
         </div>

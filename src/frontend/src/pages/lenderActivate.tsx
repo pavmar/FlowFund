@@ -17,6 +17,8 @@ export default function LenderActivatePage() {
 
   const [isLender, setIsLender] = React.useState(false);
   const [walletAddress, setWalletAddress] = React.useState<string | null>(null); // State for wallet address
+  const [contractBalance, setContractBalance] = React.useState<string>('0'); // State for contract balance
+  const [withdrawAmount, setWithdrawAmount] = React.useState<string>(''); // State for withdrawal amount
 
   React.useEffect(() => {
     const fetchLenderDetails = async () => {
@@ -50,6 +52,12 @@ export default function LenderActivatePage() {
           amount: lender.minBorrowAmount?.toString() || '',
           duration: lender.durationDays?.toString() || '',
         });
+
+        // Fetch contract balance
+        const contractBalanceResponse = await axios.get(
+          `http://localhost:9090/api/contract/balance/${lender.contractId}`
+        );
+        setContractBalance(contractBalanceResponse.data.balance);
       } catch (error: any) {
         console.error('Error fetching details:', error.response?.data || error.message);
       }
@@ -61,6 +69,33 @@ export default function LenderActivatePage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleWithdrawChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setWithdrawAmount(e.target.value);
+  };
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || isNaN(parseFloat(withdrawAmount)) || parseFloat(withdrawAmount) <= 0) {
+      alert('Please enter a valid withdrawal amount');
+      return;
+    }
+
+    try {
+      const response = await axios.post('http://localhost:9090/api/lender/withdraw', {
+        lenderEmail: email,
+        amount: withdrawAmount,
+      });
+
+      if (response.status === 200) {
+        alert('Funds withdrawn successfully!');
+        setWithdrawAmount(''); // Clear the input field
+        setContractBalance((prev) => (parseFloat(prev) - parseFloat(withdrawAmount)).toString()); // Update balance
+      }
+    } catch (error: any) {
+      console.error('Error withdrawing funds:', error.response?.data || error.message);
+      alert(error.response?.data?.error || 'Failed to withdraw funds.');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,7 +125,7 @@ export default function LenderActivatePage() {
   return (
     <Box
       component="form"
-      sx={{ '& > :not(style)': { m: 1, width: '25ch' } }}
+      sx={{ '& > :not(style)': { m: 1, width: '100%' } }}
       noValidate
       autoComplete="off"
       onSubmit={handleSubmit}
@@ -99,41 +134,86 @@ export default function LenderActivatePage() {
         <strong>Account Address:</strong>{' '}
         {walletAddress ? walletAddress : 'Wallet is not connected'}
       </Box>
-      <TextField
-        id="interest"
-        label="Interest"
-        variant="filled"
-        value={formData.interest}
-        onChange={handleChange}
-        required
-      />
-      <TextField
-        id="amount"
-        label="Amount"
-        variant="filled"
-        value={formData.amount}
-        onChange={handleChange}
-        required
-      />
-      <TextField
-        id="duration"
-        label="Duration"
-        variant="filled"
-        value={formData.duration}
-        onChange={handleChange}
-        required
-      />
+
+      {/* Update Contract Balance Section */}
       <Box
         sx={{
-          display: 'flex',
-          justifyContent: 'flex-end',
           mt: 4,
-          pr: 2,
+          border: '1px solid #ccc',
+          borderRadius: '8px',
+          padding: '16px',
+          width: '80%', // Increased width
+          margin: '0 auto', // Center the box
         }}
       >
-        <Button type="submit" variant="contained" color="primary">
-          {isLender ? 'Update' : 'Submit'}
-        </Button>
+        <h3>Update Contract Balance</h3>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            id="interest"
+            label="Interest"
+            variant="filled"
+            value={formData.interest}
+            onChange={handleChange}
+            required
+          />
+          <TextField
+            id="amount"
+            label="Amount"
+            variant="filled"
+            value={formData.amount}
+            onChange={handleChange}
+            required
+          />
+          <TextField
+            id="duration"
+            label="Duration"
+            variant="filled"
+            value={formData.duration}
+            onChange={handleChange}
+            required
+          />
+        </Box>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            mt: 2,
+          }}
+        >
+          <Button type="submit" variant="contained" color="primary">
+            {isLender ? 'Update' : 'Submit'}
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Withdraw Funds Section */}
+      <Box
+        sx={{
+          mt: 4,
+          border: '1px solid #ccc',
+          borderRadius: '8px',
+          padding: '16px',
+          width: '80%', // Increased width
+          margin: '0 auto', // Center the box
+        }}
+      >
+        <h3>Contract Balance: {contractBalance} ETH</h3>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            id="withdrawAmount"
+            label="Withdraw Amount"
+            variant="filled"
+            value={withdrawAmount}
+            onChange={handleWithdrawChange}
+          />
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={handleWithdraw}
+          >
+            Withdraw Funds
+          </Button>
+        </Box>
       </Box>
     </Box>
   );

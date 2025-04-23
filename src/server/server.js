@@ -1019,6 +1019,69 @@ app.get('/api/pastLoans/count', async (req, res) => {
   }
 });
 
+// Get contract balance
+app.get('/api/contract/balance/:contractId', async (req, res) => {
+  const { contractId } = req.params;
+
+  try {
+    const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL);
+    const balance = await provider.getBalance(contractId);
+    res.status(200).json({ balance: ethers.utils.formatEther(balance) });
+  } catch (error) {
+    console.error('Error fetching contract balance:', error);
+    res.status(500).json({ error: 'Failed to fetch contract balance' });
+  }
+});
+
+// Withdraw lender funds
+app.post('/api/lender/withdraw', async (req, res) => {
+  const { lenderEmail, amount } = req.body;
+
+  try {
+    // Validate the amount
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+      return res.status(400).json({ error: 'Invalid withdrawal amount' });
+    }
+
+    const lender = await Lender.findOne({ userEmail: lenderEmail });
+    if (!lender) {
+      return res.status(404).json({ error: 'Lender not found' });
+    }
+
+    const user = await User.findOne({ userEmail: lenderEmail });
+    if (!user || !user.privateKey) {
+      return res.status(404).json({ error: 'User not found or private key is missing' });
+    }
+
+    const provider = new ethers.providers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL);
+    const signer = new ethers.Wallet(user.privateKey, provider); // Use lender's private key
+    const contractPath = path.join(__dirname, '../../contract/artifacts/src/LendingContract.sol/LendingContract.json');
+    const contractJson = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
+    const { abi } = contractJson;
+
+    const lendingContract = new ethers.Contract(lender.contractId, abi, signer);
+
+    const amountInWei = ethers.utils.parseEther(amount.toString()); // Convert amount to Wei
+    console.log(`Withdrawing ${amount} ETH (${amountInWei.toString()} Wei) for lender: ${lenderEmail}`);
+
+    const tx = await lendingContract.withdrawLenderFunds(amountInWei);
+    await tx.wait();
+
+
+    const lenderBalance = await lendingContract.balances(signer.address);
+    if (lenderBalance <= 0) {
+      await Lender.deleteOne({ _id: lender._id }); // Delete lender entry if balance is zero
+    } else {
+      await lender.save();
+    }
+
+    res.status(200).json({ message: 'Funds withdrawn successfully' });
+  } catch (error) {
+    console.error('Error withdrawing lender funds:', error);
+    res.status(500).json({ error: 'Failed to withdraw lender funds' });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 9090;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
