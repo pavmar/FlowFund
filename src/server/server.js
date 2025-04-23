@@ -79,6 +79,25 @@ const borrowSchema = new mongoose.Schema({
 
 const Borrow = mongoose.model('Borrow', borrowSchema);
 
+// Define the PastLoan schema (same as Borrow schema)
+const pastLoanSchema = new mongoose.Schema({
+  contractId: { type: String, required: true },
+  lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lender' },
+  lenderEmail: { type: String, required: true },
+  borrowerUserEmail: { type: String, required: true },
+  borrowAmount: { type: Number, required: true },
+  borrowDate: { type: Date, default: Date.now },
+  pendingAmount: { type: Number, required: true },
+  lastTransactionDetails: { type: String, default: null },
+  collateral: {
+    ethereumNetwork: { type: String, required: true },
+    accountAddress: { type: String, required: true },
+    collateralAmount: { type: Number, required: true },
+  },
+});
+
+const PastLoan = mongoose.model('PastLoan', pastLoanSchema);
+
 // Swagger configuration
 const swaggerOptions = {
   definition: {
@@ -948,7 +967,12 @@ app.post('/api/repay', async (req, res) => {
     // Update the borrow record in the database
     borrow.pendingAmount -= repayAmount;
     if (borrow.pendingAmount <= 0) {
-      // If pendingAmount is zero or less, delete the borrow record
+      // Save the borrow record to the PastLoan collection
+      const pastLoan = new PastLoan(borrow.toObject());
+      await pastLoan.save();
+      console.log('Borrow record moved to PastLoan collection.');
+
+      // Delete the borrow record
       await Borrow.deleteOne({ _id: borrow._id });
       console.log('Borrow record deleted as pending amount is zero.');
     } else {
