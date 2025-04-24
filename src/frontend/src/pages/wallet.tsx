@@ -26,7 +26,7 @@ export default function WalletPage() {
 
       try {
         // Fetch user details from the database
-        const response = await axios.get('http://localhost:9090/api/user/details', {
+        const response = await axios.get(import.meta.env.VITE_SERVER_URL + '/api/user/details', {
           params: { email },
         });
 
@@ -77,7 +77,7 @@ export default function WalletPage() {
 
     try {
       // Update the wallet address and private key in the user database
-      await axios.post('http://localhost:9090/api/auth/updateUserDetails', {
+      await axios.post(import.meta.env.VITE_SERVER_URL + '/api/auth/updateUserDetails', {
         email,
         walletAddress,
         privateKey,

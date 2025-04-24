@@ -54,7 +54,7 @@ export default function SignIn() {
 
             // Check if the user exists in the database and add them if not
             try {
-              const userCheckResponse = await fetch('http://localhost:9090/api/auth/checkUser', {
+              const userCheckResponse = await fetch(import.meta.env.VITE_SERVER_URL + '/api/auth/checkUser', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: result.user.email }),
@@ -72,7 +72,7 @@ export default function SignIn() {
 
             // Update login activity in the backend
             try {
-              const loginResponse = await fetch('http://localhost:9090/api/auth/login', {
+              const loginResponse = await fetch(import.meta.env.VITE_SERVER_URL + '/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: result.user.email }),

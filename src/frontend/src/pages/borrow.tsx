@@ -35,7 +35,7 @@ export default function BorrowPage() {
   // Fetch lenders from the database
   const fetchLenders = async () => {
     try {
-      const response = await axios.get('http://localhost:9090/api/lenders'); // Backend endpoint to fetch lenders
+      const response = await axios.get(import.meta.env.VITE_SERVER_URL + '/api/lenders'); // Backend endpoint to fetch lenders
       const allLenders = response.data;
 
       // Filter out lenders with the same email as the logged-in user
@@ -51,7 +51,7 @@ export default function BorrowPage() {
   // Check if wallet address and private key are set
   const checkWallet = async () => {
     try {
-      const response = await axios.get(`http://localhost:9090/api/user/wallet?email=${userEmail}`);
+      const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/user/wallet?email=${userEmail}`);
       const { walletAddress, privateKey } = response.data;
 
       if (!walletAddress || !privateKey) {
@@ -79,7 +79,7 @@ export default function BorrowPage() {
     setSelectedLender(lenderId);
 
     try {
-      const response = await axios.post('http://localhost:9090/api/searchBorrow', {
+      const response = await axios.post(import.meta.env.VITE_SERVER_URL + '/api/searchBorrow', {
         borrowerUserEmail: userEmail, // Borrower's email
         lenderEmail: lenderEmail, // Lender's email
       });
@@ -112,7 +112,7 @@ export default function BorrowPage() {
     }
 
     try {
-      const response = await axios.post('http://localhost:9090/api/borrow', {
+      const response = await axios.post(import.meta.env.VITE_SERVER_URL + '/api/borrow', {
         lenderEmail: lenders.find((lender) => lender._id === selectedLender)?.userEmail,
         borrowerUserEmail: userEmail,
         borrowAmount,

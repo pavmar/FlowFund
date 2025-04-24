@@ -21,7 +21,7 @@ export default function SettingsPage() {
   React.useEffect(() => {
     const fetchUserDetails = async () => {
       try {
-        const response = await axios.get(`http://localhost:9090/api/user/profile?email=${userEmail}`);
+        const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/user/profile?email=${userEmail}`);
         const userData = response.data;
 
         setAddress(userData.address || ''); // Set address if available, else empty
@@ -65,7 +65,7 @@ export default function SettingsPage() {
   // Handle address update
   const handleUpdateAddress = async () => {
     try {
-      await axios.post('http://localhost:9090/api/user/updateAddress', {
+      await axios.post(import.meta.env.VITE_SERVER_URL + '/api/user/updateAddress', {
         email: userEmail,
         address,
       });
@@ -79,7 +79,7 @@ export default function SettingsPage() {
   // Handle phone number update
   const handleUpdatePhoneNumber = async () => {
     try {
-      await axios.post('http://localhost:9090/api/user/updatePhoneNumber', {
+      await axios.post(import.meta.env.VITE_SERVER_URL + '/api/user/updatePhoneNumber', {
         email: userEmail,
         phoneNumber,
       });
@@ -104,7 +104,7 @@ export default function SettingsPage() {
 
     try {
       // Call the backend to check for active loans and delete the user from the database
-      const response = await axios.post('http://localhost:9090/api/user/deleteAccount', {
+      const response = await axios.post(import.meta.env.VITE_SERVER_URL + '/api/user/deleteAccount', {
         email: userEmail,
       });
 

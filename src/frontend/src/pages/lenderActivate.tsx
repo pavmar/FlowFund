@@ -26,7 +26,7 @@ export default function LenderActivatePage() {
 
       try {
         // Fetch wallet address directly from the User database
-        const userResponse = await axios.get('http://localhost:9090/api/user/details', {
+        const userResponse = await axios.get(import.meta.env.VITE_SERVER_URL + '/api/user/details', {
           params: { email },
         });
 
@@ -34,7 +34,7 @@ export default function LenderActivatePage() {
         setWalletAddress(userWalletAddress || null);
 
         // Fetch lender details
-        const lenderResponse = await axios.get('http://localhost:9090/api/lender/details', {
+        const lenderResponse = await axios.get(import.meta.env.VITE_SERVER_URL + '/api/lender/details', {
           params: { email },
         });
 
@@ -55,7 +55,7 @@ export default function LenderActivatePage() {
 
         // Fetch contract balance
         const contractBalanceResponse = await axios.get(
-          `http://localhost:9090/api/contract/balance/${lender.contractId}`
+          `${import.meta.env.VITE_SERVER_URL}/api/contract/balance/${lender.contractId}`
         );
         setContractBalance(contractBalanceResponse.data.balance);
       } catch (error: any) {
@@ -82,7 +82,7 @@ export default function LenderActivatePage() {
     }
 
     try {
-      const response = await axios.post('http://localhost:9090/api/lender/withdraw', {
+      const response = await axios.post(import.meta.env.VITE_SERVER_URL + '/api/lender/withdraw', {
         lenderEmail: email,
         amount: withdrawAmount,
       });
@@ -106,7 +106,7 @@ export default function LenderActivatePage() {
     }
 
     try {
-      const response = await axios.post('http://localhost:9090/api/lender/activate', {
+      const response = await axios.post(import.meta.env.VITE_SERVER_URL + '/api/lender/activate', {
         email,
         interestRate: parseFloat(formData.interest),
         durationDays: parseInt(formData.duration, 10),

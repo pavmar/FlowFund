@@ -12,9 +12,9 @@ export default function Home() {
     async function fetchStats() {
       try {
         const [borrowersRes, lendersRes, pastLoansRes] = await Promise.all([
-          axios.get('http://localhost:9090/api/borrowers/count'), // API to get active borrowers count
-          axios.get('http://localhost:9090/api/lenders/count'), // API to get active lenders count
-          axios.get('http://localhost:9090/api/pastLoans/count'), // API to get past loans count
+          axios.get(import.meta.env.VITE_SERVER_URL + '/api/borrowers/count'), // API to get active borrowers count
+          axios.get(import.meta.env.VITE_SERVER_URL + '/api/lenders/count'), // API to get active lenders count
+          axios.get(import.meta.env.VITE_SERVER_URL + '/api/pastLoans/count'), // API to get past loans count
         ]);
 
         setStats({

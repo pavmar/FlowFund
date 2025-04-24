@@ -25,7 +25,7 @@ export default function SignUp() {
       const result = await signUp(email, password);
       if (result?.success) {
         // Add user details to the backend
-        const response = await fetch('http://localhost:9090/api/auth/addUser', {
+        const response = await fetch(import.meta.env.VITE_SERVER_URL + '/api/auth/addUser', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, fullName: 'New User' }), // Ensure email is passed here

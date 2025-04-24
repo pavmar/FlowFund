@@ -16,7 +16,7 @@ export default function PaymentsPage() {
   React.useEffect(() => {
     const fetchLoanDetails = async () => {
       try {
-        const response = await axios.get('http://localhost:9090/api/payments', {
+        const response = await axios.get(import.meta.env.VITE_SERVER_URL + '/api/payments', {
           params: { userEmail },
         });
         setLoanDetails(response.data);
@@ -44,7 +44,7 @@ export default function PaymentsPage() {
     }
 
     try {
-      const response = await axios.post('http://localhost:9090/api/repay', {
+      const response = await axios.post(import.meta.env.VITE_SERVER_URL + '/api/repay', {
         borrowerUserEmail: userEmail,
         repayAmount,
       });
