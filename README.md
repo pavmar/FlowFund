@@ -54,3 +54,7 @@ Open anothr terminal
 cd hardhat
 npm install --legacy-peer-deps
 npx hardhat node
+
+## Access 
+
+http://localhost:5173
