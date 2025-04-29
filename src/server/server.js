@@ -242,6 +242,40 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/lender/activate:
+ *   post:
+ *     summary: Activate a lender account
+ *     tags: [Lender]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: lender@example.com
+ *               interestRate:
+ *                 type: number
+ *                 example: 5
+ *               durationDays:
+ *                 type: number
+ *                 example: 30
+ *               minBorrowAmount:
+ *                 type: number
+ *                 example: 1000
+ *     responses:
+ *       201:
+ *         description: Lender account activated successfully
+ *       400:
+ *         description: Missing required fields
+ *       500:
+ *         description: Failed to activate lender account
+ */
+
 app.post('/api/lender/activate', async (req, res) => {
   const { email, interestRate, durationDays, minBorrowAmount } = req.body;
 
@@ -329,6 +363,30 @@ app.post('/api/lender/activate', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/lender/details:
+ *   get:
+ *     summary: Get lender details
+ *     tags: [Lender]
+ *     parameters:
+ *       - in: query
+ *         name: email
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Email of the lender
+ *     responses:
+ *       200:
+ *         description: Lender details retrieved successfully
+ *       400:
+ *         description: Email is required
+ *       404:
+ *         description: Lender not found
+ *       500:
+ *         description: Failed to fetch lender details
+ */
+
 app.get('/api/lender/details', async (req, res) => {
   const { email } = req.query;
 
@@ -357,6 +415,19 @@ app.get('/api/lender/details', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/lenders:
+ *   get:
+ *     summary: Get all lenders
+ *     tags: [Lender]
+ *     responses:
+ *       200:
+ *         description: List of lenders retrieved successfully
+ *       500:
+ *         description: Failed to fetch lenders
+ */
+
 app.get('/api/lenders', async (req, res) => {
   try {
     const lenders = await Lender.find({});
@@ -366,6 +437,34 @@ app.get('/api/lenders', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch lenders' });
   }
 });
+
+/**
+ * @swagger
+ * /api/searchBorrow:
+ *   post:
+ *     summary: Search for a borrow record
+ *     tags: [Borrow]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               borrowerUserEmail:
+ *                 type: string
+ *                 example: user@example.com
+ *               lenderEmail:
+ *                 type: string
+ *                 example: lender@example.com
+ *     responses:
+ *       200:
+ *         description: Borrow record found or not found
+ *       400:
+ *         description: Missing required fields
+ *       500:
+ *         description: Failed to fetch borrow record
+ */
 
 app.post('/api/searchBorrow', async (req, res) => {
   const { borrowerUserEmail, lenderEmail } = req.body;
@@ -391,6 +490,36 @@ app.post('/api/searchBorrow', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch borrow record' });
   }
 });
+
+/**
+ * @swagger
+ * /api/auth/updateWalletAddress:
+ *   post:
+ *     summary: Update wallet address for a user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: user@example.com
+ *               walletAddress:
+ *                 type: string
+ *                 example: 0x1234567890abcdef
+ *     responses:
+ *       200:
+ *         description: Wallet address updated successfully
+ *       400:
+ *         description: Missing required fields
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Failed to update wallet address
+ */
 
 app.post('/api/auth/updateWalletAddress', async (req, res) => {
   const { email, walletAddress } = req.body;
