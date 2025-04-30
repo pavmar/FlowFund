@@ -72,3 +72,20 @@ npx hardhat node
 ### 🌐 Access
 
 [http://localhost:5173](http://localhost:5173)
+
+## Testing
+
+### setup
+
+```bash
+npm install --save-dev @playwright/test
+npx playwright install
+```
+
+### Running test cases
+
+```bash
+npx playwright test
+```
+```
+
